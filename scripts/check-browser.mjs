@@ -537,6 +537,22 @@ try {
     const materials = (await radios()).filter(r => r.action.startsWith('choice.material.'));
     check('Applicable Material restores the remembered selection', materials.every(r => !r.disabled) && materials.some(r => r.action === 'choice.material.tint' && r.checked === 'true'));
   });
+  await run('Interface sounds can be disabled and persist', async () => {
+    await page(); await group('focus');
+    const before = await settingsSnapshot();
+    const audioChoices = (await radios()).filter(row => row.action.startsWith('choice.uiAudio.'));
+    check('Focus settings expose explicit Interface sounds On and Off choices', same(audioChoices.map(row => row.action), ['choice.uiAudio.on', 'choice.uiAudio.off']) && audioChoices[0].checked === 'true', audioChoices);
+    await choice('uiAudio', 'off');
+    const disabled = await settingsSnapshot();
+    check('Turning Interface sounds Off saves once', disabled.committed.uiAudio === 'off' && disabled.writes === before.writes + 1 && (await radios()).some(row => row.action === 'choice.uiAudio.off' && row.checked === 'true'), disabled);
+    await nav('back', 'back');
+    const soundCount = (await call('sounds')).length;
+    await nav('right', 'left', 'up', 'down');
+    check('Disabled Interface sounds suppress every Home focus cue', (await call('sounds')).length === soundCount, await call('sounds'));
+    await act('util.settings'); await act('settings.group.focus'); await choice('uiAudio', 'on');
+    await nav('back', 'back', 'right');
+    check('Re-enabling Interface sounds restores app-bar feedback', (await state()).committed.uiAudio === 'on' && (await call('sounds')).at(-1) === 'MOVE', { state: await state(), sounds: await call('sounds') });
+  });
   await run('Settings inactive photo tools retain wallpaper preferences', async () => {
     await page();
     for (const bg of ['dark', 'light']) {
@@ -959,6 +975,8 @@ try {
     await nav('left');
     await nav('up');
     check('Up from the app bar first lands on the existing Home controls', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
+    const neutralDock = await current.evaluate(() => ({ appStates: document.querySelectorAll('#track .tile.is-focus, #track .tile.is-sel').length, plate: document.getElementById('plate').className }));
+    check('Home controls fully clear the remembered app emphasis in Dock', neutralDock.appStates === 0 && !/on-focus|on-sel/.test(neutralDock.plate), neutralDock);
     await nav('up');
     await current.waitForTimeout(280);
     const tray = await current.evaluate(() => {
@@ -1051,6 +1069,10 @@ try {
     await page();
     await current.waitForFunction(() => document.querySelectorAll('#inputs .input').length === 4);
     await look({ layout: 'list', apps: 'text' });
+    await nav('right');
+    const neutralList = await current.evaluate(() => ({ appStates: document.querySelectorAll('#phRows .ph-row.is-focus, #phRows .ph-row.is-sel').length, plates: [...document.querySelectorAll('#phScene .ph-plate')].map(node => node.className) }));
+    check('Home controls fully clear the remembered app emphasis in List', neutralList.appStates === 0 && neutralList.plates.every(name => !/on-focus|on-sel/.test(name)), neutralList);
+    await nav('left');
     await nav(...Array(PRIMARY.length).fill('down'));
     const sourceTray = await current.evaluate(() => {
       const stage = document.querySelector('#stage'), inputs = document.querySelector('#inputs');

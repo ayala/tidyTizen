@@ -109,7 +109,7 @@
   var LOOK_KEYS = ['bg', 'layout', 'apps', 'font', 'controls', 'focus', 'material'];
   var LOOK_VALUES = { bg: ['dark', 'light', 'photo'], layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], font: Object.keys(FONTS).filter(function (id) { return id === 'manrope' || PRIVATE_FONTS.indexOf(id) >= 0; }), controls: ['icons', 'both', 'text'], focus: ['type', 'glass'], material: ['soft', 'frost', 'tint'] };
   var LOOK_NAMES = { bg: 'Background', layout: 'Layout', apps: 'Apps', font: 'Font', controls: 'Home controls', focus: 'Focus', material: 'Material' };
-  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text' };
+  var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', on: 'On', off: 'Off' };
   var UTIL = { apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
   var MSG = {
     leave: { title: 'Leave Home?', line: 'Open Samsung Home?', note: '', actions: [['stay', 'Stay'], ['samsung', 'Samsung Home']] }
@@ -599,7 +599,8 @@
       mode: pick(s.mode, MODES.map(function (m) { return m.id; }), 'fixed'),
       artwork: pick(s.artwork, ARTWORK.map(function (a) { return a.id; }), wall(modern.wall || s.wallpaper) && wall(modern.wall || s.wallpaper).remote ? 'mixed' : 'scenery'),
       artworkRate: pick(s.artworkRate, ARTWORK_RATES.map(function (a) { return a.id; }), '16s'), excluded: excluded,
-      artworkSelections: selections.map(function (w) { return JSON.parse(JSON.stringify(w)); })
+      artworkSelections: selections.map(function (w) { return JSON.parse(JSON.stringify(w)); }),
+      uiAudio: pick(s.uiAudio, ['on', 'off'], 'on')
     };
   }
   function serialise(c) {
@@ -628,7 +629,7 @@
   }
   function clearSession() { S.undo = []; S.removedAt = {}; S.note = null; S.err = null; }
   function begin() { S.note = null; }
-  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; c.artwork = S.c.artwork; c.artworkRate = S.c.artworkRate; c.excluded = S.c.excluded.slice(); c.artworkSelections = JSON.parse(JSON.stringify(S.c.artworkSelections || [])); c.sourceProfiles = JSON.parse(JSON.stringify(S.c.sourceProfiles || {})); return c; }
+  function next(home, recent) { var c = lookOf(S.c); c.home = home; c.recent = recent; c.lastApp = S.c.lastApp; c.mode = S.c.mode; c.artwork = S.c.artwork; c.artworkRate = S.c.artworkRate; c.excluded = S.c.excluded.slice(); c.artworkSelections = JSON.parse(JSON.stringify(S.c.artworkSelections || [])); c.sourceProfiles = JSON.parse(JSON.stringify(S.c.sourceProfiles || {})); c.uiAudio = S.c.uiAudio; return c; }
   function snap() { return { home: S.c.home.slice(), recent: S.c.recent.slice() }; }
   function pushRecent(list, id) { return [id].concat(without(list, id)).slice(0, 5); }
   function write(c, label) {
@@ -1268,7 +1269,8 @@
     if (t.group === 'focus') return [
       { id: 'focus', title: 'Focus style', horizontal: true, items: options('focus', ['type', 'glass']) },
       { id: 'material', title: 'Material', horizontal: true, items: options('material', ['soft', 'frost', 'tint'], inactive),
-        reason: inactive ? flat ? 'Materials are available with a Photo background.' : 'Choose Glass focus or the Dock layout to use materials.' : '' }
+        reason: inactive ? flat ? 'Materials are available with a Photo background.' : 'Choose Glass focus or the Dock layout to use materials.' : '' },
+      { id: 'uiAudio', title: 'Interface sounds', horizontal: true, items: options('uiAudio', ['on', 'off']) }
     ];
     if (t.group === 'rotation') return [{ id: 'artworkRate', title: '', items: options('artworkRate', ARTWORK_RATES.map(function (rate) { return rate.id; }), flat),
       reason: 'Rotation runs only on Home and only through your selected backdrops.' }];
@@ -1312,6 +1314,12 @@
     S.err = null; S.lookError = null;
     c = next(S.c.home.slice(), S.c.recent.slice()); c.artworkRate = value;
     if (!write(c, 'Artwork rotation')) S.lookError = { type: 'save', patch: { artworkRate: value }, row: 'artworkRate', transient: false };
+  }
+  function applyUiAudio(value) {
+    var c;
+    if (['on', 'off'].indexOf(value) < 0 || value === S.c.uiAudio) return;
+    c = next(S.c.home.slice(), S.c.recent.slice()); c.uiAudio = value;
+    if (!write(c, 'Interface sounds')) S.lookError = { type: 'save', patch: { uiAudio: value }, row: 'uiAudio', transient: false };
   }
   function applyArtwork(value) {
     var pool, curated, target;
@@ -1366,10 +1374,12 @@
       if (error && error.patch[error.row] !== undefined) detailFocus(t, choice(error.row, error.patch[error.row]), 0);
       if (error && error.row === 'mode') applyRotation(error.patch.mode);
       else if (error && error.row === 'artworkRate') applyArtworkRate(error.patch.artworkRate);
+      else if (error && error.row === 'uiAudio') applyUiAudio(error.patch.uiAudio);
       else if (error) setLook(error.patch, { row: error.row });
     } else if (item.axis === 'mode') applyRotation(item.value);
     else if (item.axis === 'artworkRate') applyArtworkRate(item.value);
     else if (item.axis === 'artwork') applyArtwork(item.value);
+    else if (item.axis === 'uiAudio') applyUiAudio(item.value);
     else if (item.toggleKind === 'backdrop') toggleBackdrop(t, item.value);
     else if (item.toggle) toggleArtworkFilter(item.value);
     else if (item.axis) { patch[item.axis] = item.value; setLook(patch, { row: item.axis }); }
@@ -1622,7 +1632,7 @@
   }
   function playHomeSound(k, before, after) {
     var type = '', inHome = before.view === 'home' || before.view === 'curator' || after.view === 'home' || after.view === 'curator';
-    if (!inHome) return;
+    if (!inHome || S.c.uiAudio === 'off') return;
     if (k === 'ok') type = 'SELECT';
     else if (k === 'back') type = 'BACK';
     else if (before.view === after.view && before.zone === after.zone && before.focus === after.focus && before.selected === after.selected) return;
@@ -1932,7 +1942,7 @@
     var items = hs.items, n = items.length, empty = hs.mode !== 'arrange' && !n, g = dockGeom(empty ? -1 : n);
     var anchor = clamp(hs.i, 0, Math.max(0, n - 1)), off = empty ? 0 : dockOffset(n, anchor, g);
     var full = hs.arr ? live(hs.arr.slots).length >= CAP : false, ns = hs.arr ? hs.arr.slots.length : n;
-    var tileFocus = hs.zone === 'apps' || hs.zone === 'tiles', tileSel = hs.zone === 'util' || hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
+    var tileFocus = hs.zone === 'apps' || hs.zone === 'tiles', tileSel = hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
     var focusItem = items[anchor], s, ax, label, width;
 
     dock.className = 'dock' + (empty ? ' is-empty' : '');
@@ -2043,7 +2053,7 @@
   function renderList(hs) {
     var items = hs.items, n = items.length, compact = hs.mode === 'arrange', pitch = compact ? PH_COMPACT_PITCH : PH_PITCH;
     var anchor = clamp(hs.i, 0, Math.max(0, n - 1)), first, off, width, slot, y, s, label, aw, plateState;
-    var rowFocus = hs.zone === 'apps' || hs.zone === 'tiles', remembered = hs.zone === 'util' || hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
+    var rowFocus = hs.zone === 'apps' || hs.zone === 'tiles', remembered = hs.zone === 'act' || hs.zone === 'ctl' || hs.zone === 'preview';
     photoModeTransition(compact);
     if (compact) {
       first = clamp(scroll.photoArrange, anchor - 7, anchor - 1);
