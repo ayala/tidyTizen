@@ -1600,9 +1600,29 @@
     var t = top();
     return { view: t.id, zone: t.f && t.f.zone || '', focus: JSON.stringify(t.f || {}) };
   }
+  var navAudioContext = null, navSoundLog = [];
+  function playSoftCue(type) {
+    var AudioEngine = window.AudioContext || window.webkitAudioContext, context, oscillator, gain, now;
+    var cue = {
+      MOVE: [500, 0.032, 0.010], UP: [610, 0.040, 0.012], DOWN: [420, 0.040, 0.012],
+      LEFT: [470, 0.034, 0.010], RIGHT: [540, 0.034, 0.010], SELECT: [680, 0.048, 0.014], BACK: [360, 0.044, 0.010]
+    }[type] || [500, 0.032, 0.010];
+    navSoundLog.push(type); if (navSoundLog.length > 40) navSoundLog.shift();
+    if (!AudioEngine) return;
+    try {
+      context = navAudioContext || (navAudioContext = new AudioEngine());
+      if (context.state === 'suspended' && context.resume) context.resume();
+      now = context.currentTime; oscillator = context.createOscillator(); gain = context.createGain();
+      oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(cue[0], now);
+      oscillator.frequency.exponentialRampToValueAtTime(cue[0] * .84, now + cue[1]);
+      gain.gain.setValueAtTime(.0001, now); gain.gain.exponentialRampToValueAtTime(cue[2], now + .005);
+      gain.gain.exponentialRampToValueAtTime(.0001, now + cue[1]);
+      oscillator.connect(gain); gain.connect(context.destination); oscillator.start(now); oscillator.stop(now + cue[1] + .006);
+    } catch (e) { /* Navigation remains usable when Web Audio is unavailable. */ }
+  }
   function playHomeSound(k, before, after) {
     var type = '', inHome = before.view === 'home' || before.view === 'curator' || after.view === 'home' || after.view === 'curator';
-    if (!inHome || !window.tizen || !tizen.tvaudiocontrol || typeof tizen.tvaudiocontrol.playSound !== 'function') return;
+    if (!inHome) return;
     if (k === 'ok') type = 'SELECT';
     else if (k === 'back') type = 'BACK';
     else if (before.view === after.view && before.zone === after.zone && before.focus === after.focus) return;
@@ -1610,7 +1630,7 @@
     else if (after.view === 'home' && after.zone === 'curate' && before.zone !== 'curate') type = 'UP';
     else if (before.zone === 'inputs' || after.zone === 'inputs' || before.view === 'curator' || after.view === 'curator') type = k.toUpperCase();
     else type = 'MOVE';
-    try { tizen.tvaudiocontrol.playSound(type); } catch (e) { /* Audio feedback is optional on unsupported TVs. */ }
+    playSoftCue(type);
   }
   function press(k) {
     norm();
@@ -2704,6 +2724,7 @@
     out.undo = S.undo.map(function (u) { return u.label; }); out.storageOk = storageOk;
     return JSON.parse(JSON.stringify(out));
   };
+  QA.sounds = function () { return navSoundLog.slice(); };
   QA.where = function () {
     var action = focusedAction(), active = actionRoot().querySelectorAll('.is-focus[data-action]'), count = 0, name = '';
     Array.prototype.forEach.call(active, function (el) { if (renderedAction(el)) { count++; if (el.getAttribute('data-action') === action) name = el.getAttribute('aria-label') || el.textContent.replace(/\s+/g, ' ').trim(); } });

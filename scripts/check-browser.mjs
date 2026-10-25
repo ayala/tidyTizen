@@ -960,10 +960,10 @@ try {
     await current.waitForTimeout(280);
     const tray = await current.evaluate(() => {
       const stage = document.getElementById('stage').getBoundingClientRect(), scene = document.getElementById('scene').getBoundingClientRect(), bg = document.querySelector('.bg').getBoundingClientRect(), home = document.getElementById('home').getBoundingClientRect(), dock = document.getElementById('dock').getBoundingClientRect(), icon = document.querySelector('.curate-entry .symbol-image-plus').getBoundingClientRect(), label = document.getElementById('curateLabel').getBoundingClientRect(), entry = document.getElementById('curateEntry'), style = getComputedStyle(entry);
-      return { action: ShoreQA.state().focusAction, zone: ShoreQA.where().zone, sceneTop: scene.top, bgTop: bg.top - stage.top, homeTop: home.top - stage.top, dockBottom: dock.bottom - stage.top, iconGap: label.left - icon.right, label: label.width ? document.getElementById('curateLabel').textContent : '', radius: getComputedStyle(document.getElementById('scene')).borderTopLeftRadius, entryBackground: style.backgroundColor, entryShadow: style.boxShadow, revealHeight: document.getElementById('curateReveal').getBoundingClientRect().height, focusCount: ShoreQA.where().focusCount, sounds: window.__tv.sounds.slice() };
+      return { action: ShoreQA.state().focusAction, zone: ShoreQA.where().zone, sceneTop: scene.top, bgTop: bg.top - stage.top, homeTop: home.top - stage.top, dockBottom: dock.bottom - stage.top, iconGap: label.left - icon.right, label: label.width ? document.getElementById('curateLabel').textContent : '', radius: getComputedStyle(document.getElementById('scene')).borderTopLeftRadius, entryBackground: style.backgroundColor, entryShadow: style.boxShadow, revealHeight: document.getElementById('curateReveal').getBoundingClientRect().height, focusCount: ShoreQA.where().focusCount, sounds: ShoreQA.sounds() };
     });
     check('Up reveals the compact, unplated curator label with preserved inverse parallax', tray.action === 'home.curate' && tray.zone === 'curate' && Math.abs(tray.sceneTop - 130) < 1 && Math.abs(tray.bgTop - 68) < 1 && Math.abs(tray.homeTop - 152) < 1 && Math.abs(tray.homeTop - tray.bgTop - 84) < 1 && tray.dockBottom <= 1080 && parseFloat(tray.radius) >= 48 && tray.revealHeight === 130 && tray.iconGap >= 23 && tray.label === 'curate your backdrops' && tray.entryBackground === 'rgba(0, 0, 0, 0)' && tray.entryShadow === 'none' && tray.focusCount === 1, tray);
-    check('Home navigation uses native Samsung move audio with a distinct curator-entry cue', tray.sounds[0] === 'MOVE' && tray.sounds[1] === 'UP', tray.sounds);
+    check('Home navigation uses a quiet move cue with a distinct curator-entry pitch', tray.sounds[0] === 'MOVE' && tray.sounds[1] === 'UP', tray.sounds);
     await current.screenshot({ path: out + 'curator-tray.jpg', quality: 92 });
     await nav('down');
     check('Down from Curate lands on the existing Home controls instead of skipping them', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
@@ -1053,10 +1053,10 @@ try {
       const stage = document.querySelector('#stage'), inputs = document.querySelector('#inputs');
       const focused = inputs.querySelector('.input.is-focus');
       return { open: stage.classList.contains('sources-open'), display: getComputedStyle(inputs).display,
-        visible: getComputedStyle(inputs).visibility, focused: focused && focused.dataset.action, sounds: window.__tv.sounds.slice() };
+        visible: getComputedStyle(inputs).visibility, focused: focused && focused.dataset.action, sounds: ShoreQA.sounds() };
     });
     check('Down from the last List app reveals and focuses Sources', sourceTray.open && sourceTray.display === 'flex' && sourceTray.visible === 'visible' && /^home\.input\./.test(sourceTray.focused || ''), sourceTray);
-    check('Opening Sources has a distinct native down cue', sourceTray.sounds[sourceTray.sounds.length - 1] === 'DOWN', sourceTray.sounds);
+    check('Opening Sources has a distinct quiet down cue', sourceTray.sounds[sourceTray.sounds.length - 1] === 'DOWN', sourceTray.sounds);
     await nav('up');
     check('Up closes Sources back to the last List app', (await state()).focusAction === 'home.app.xbox' && !(await current.locator('#stage').evaluate(el => el.classList.contains('sources-open'))), await call('where'));
   });
