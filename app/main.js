@@ -1608,7 +1608,7 @@
     utilFocusLabel.className = 'util-focus-label is-on';
   }
   function renderUtilityLens(button, iconsOnly) {
-    var r, label, sr, scale, x, y, width, key, el;
+    var r, sr, scale, x, y, width, key, el;
     if (!button || S.c.focus !== 'glass') {
       utPlates.forEach(function (plateEl) { plateEl.className = 'ph-plate ut-lens is-outgoing'; });
       utPlateKey = null;
@@ -1616,14 +1616,9 @@
     }
     r = button.getBoundingClientRect(); sr = sceneEl.getBoundingClientRect(); scale = sr.width / 1920 || 1;
     y = (r.top - sr.top) / scale + 2;
-    if (S.c.layout === 'list') {
-      label = iconsOnly ? utilFocusLabel : button.querySelector('.u-label');
-      x = (label.getBoundingClientRect().left - sr.left) / scale - 24;
-      width = 1800 - x;
-    } else {
-      // Dock icons keep a fixed lens; the separate caption cannot overlap its neighbours.
-      x = (r.left - sr.left) / scale; width = r.width / scale;
-    }
+    // Every Home control keeps a compact lens. Extending the List lens to the
+    // screen edge made two small controls read as full-width rows.
+    x = (r.left - sr.left) / scale; width = r.width / scale;
     key = button.getAttribute('data-action') + '|' + x + '|' + y + '|' + width;
     if (key !== utPlateKey) {
       utPlates[utPlateIndex].className = 'ph-plate ut-lens is-outgoing';

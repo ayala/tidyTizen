@@ -361,6 +361,19 @@ try {
     const focusedHomeControl = await current.evaluate(() => { const button = document.querySelector('.quiet-utils .u.is-focus'); return button && { action: button.dataset.action, background: getComputedStyle(button).backgroundColor }; });
     check('The focused Home control raises its white tint to twenty percent', focusedHomeControl && focusedHomeControl.background.includes('0.2'), focusedHomeControl);
     await nav('down');
+    for (const apps of ['icons', 'both', 'text']) {
+      await look({ layout: 'list', apps, controls: 'both', focus: 'glass' });
+      await nav('up');
+      const listControls = await current.evaluate(() => {
+        const buttons = [...document.querySelectorAll('.quiet-utils .u')], rects = buttons.map(button => button.getBoundingClientRect());
+        const focused = document.querySelector('.quiet-utils .u.is-focus')?.getBoundingClientRect();
+        const lens = document.querySelector('.ut-lens.is-current')?.getBoundingClientRect();
+        return { widths: rects.map(rect => rect.width), gap: rects.length === 2 ? Math.abs(rects[0].top - rects[1].bottom) : 0,
+          focusedWidth: focused?.width || 0, lensWidth: lens?.width || 0 };
+      });
+      check('List controls stay compact and separated with ' + apps + ' app treatment', listControls.widths.length === 2 && listControls.widths.every(width => width < 260) && listControls.gap >= 19 && Math.abs(listControls.lensWidth - listControls.focusedWidth) < 1, listControls);
+      await nav('down');
+    }
     for (const material of ['soft', 'frost', 'tint']) { await look({ material }); check(material + ' matches displayed bundle', (await state()).shown.material === material && (await state()).look.material === material); }
     const fonts = (await state()).fonts.available; check('Font catalogue includes default', fonts.includes('manrope'));
     for (const font of fonts) {
