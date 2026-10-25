@@ -18,7 +18,7 @@ All UI assets, public fonts and the fifteen wallpapers are bundled. This private
 - Preferences use localStorage key `cleanframe.home.v1`, with a fallback read from `cleanframe.shore.v1`. Legacy fields are `dock`, `wallpaper`, `mode`, `lastApp` and `theme`. The 0.6 migration preserves app order, wallpaper, rotation and selection. Legacy `list` becomes Dark / List / Type; `shore` and `grid` become Photo / Dock / Glass. Appearance axes are stored separately. A saved dynamic app keeps its real app ID and name; discovery refreshes the installed catalogue. Keep migration checks when changing this format.
 - `window.ShoreQA.state()` and `.where()` expose state and focus for browser tests. `minuteMs` can shorten rotation intervals in an isolated browser test.
 
-The tested target is the Tizen 9.0 TV in [TV status](tv-status.md). The manifest's `required_version="6.5"` is a package declaration, not proof that Tizen 6.5 has been tested. The exact TV Chromium/WebKit engine version has not been recorded. Keep runtime JavaScript ES5-compatible and verify any new DOM/CSS API on the target before claiming support. `node --check` checks syntax for Node; it does not enforce ES5 or TV API availability.
+The tested target is the Samsung QN75QN800AFXZA on firmware 2220.9 and Tizen 6.0, described in [model-specific behavior](model-specific-qn800a.md). The manifest's `required_version="6.0"` is a packaging floor, not a compatibility claim for every Tizen 6 television. Keep runtime JavaScript ES5-compatible and verify any new DOM/CSS API on the target before claiming support. `node --check` checks syntax for Node; it does not enforce ES5 or TV API availability.
 
 Keep material rendering in the development tools. See [asset generation](assets.md) and [testing](testing.md).
 
@@ -67,14 +67,6 @@ For developer access, connect the TV and Mac to the same network, enable Develop
 
 ## Native Home and recovery
 
-Native Home/startup was configured separately from the app installer. Physical Home from Netflix is confirmed. The one-shot helper runs as the SDK user. See scripts/native-home/README.md and docs/tv-status.md for the tested firmware and pending visual checks.
+Installation and Home remapping are separate operations. The working QN800A route is the owner-authorized TV-local remote interceptor documented in [Home remapping on the QN800A](home-remap-qn800a.md). The retained `scripts/native-home/` folder is upstream research material, not the QN800A persistent installer. Do not run it as a substitute for the documented guarded deployment and recovery process.
 
-Query with `python3 scripts/native-home/run.py query`. Restore the saved pre-integration Home/startup values with `python3 scripts/native-home/run.py restore`. The private baseline is `.local/native-home/original.json`; preserve it and do not replace it with the applied state. The legacy `.local/native-home/run.py` command is also retained. Restore before uninstalling CleanFrame or changing its stable app identity.
-
-To rebuild the one-shot helper with this Mac's private verified SDK:
-
-```sh
-DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_CLI_HOME="$PWD/.local/native-home/cli" .local/native-home/dotnet-sdk/dotnet build scripts/native-home/Control.csproj -c Release --nologo -p:BaseIntermediateOutputPath="$PWD/.local/native-home/obj/" -o .local/native-home/out
-```
-
-The helper's output is not packaged inside the web app. Keep the original values, compiler, runtime output and all device diagnostics ignored.
+Keep compiled helpers, original Samsung files, package-database baselines, certificates, bridge tokens, device diagnostics, and rollback archives outside this public repository. Restore the original boot service before uninstalling the reference app or changing its stable application ID.

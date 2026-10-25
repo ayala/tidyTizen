@@ -64,7 +64,7 @@ Artwork results refresh at most every six hours. The interface retrieves three m
 
 ## Install on your own TV
 
-A Tizen widget must be signed for the owner's TV and Samsung account. Create your own application identity, author certificate, and distributor certificate containing your TV's DUID. Do not reuse this reference installation's identity or certificates. Samsung's official setup links and the staged process are in [development](docs/development.md) and the [TV setup guide](docs/agent-tv-setup-guide.md).
+A Tizen widget must be signed for the owner's TV and Samsung account. Create your own application identity, author certificate, and distributor certificate containing your TV's DUID. Do not reuse this reference installation's identity or certificates. Samsung's official setup links and the reference build boundaries are in [development](docs/development.md).
 
 ```sh
 npm run check
