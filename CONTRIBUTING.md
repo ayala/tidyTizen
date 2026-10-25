@@ -11,7 +11,7 @@ npm ci
 npm run dev:public
 npm run check
 npx playwright install chromium
-CLEANFRAME_PUBLIC_FONTS=1 npm run check:browser
+TIDYTIZEN_PUBLIC_FONTS=1 npm run check:browser
 npm run check:public
 ```
 

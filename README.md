@@ -68,7 +68,7 @@ A Tizen widget must be signed for the owner's TV and Samsung account. Create you
 
 ```sh
 npm run check
-CLEANFRAME_PUBLIC_FONTS=1 npm run check:browser
+TIDYTIZEN_PUBLIC_FONTS=1 npm run check:browser
 npm run check:public
 npm run export:public
 ```
