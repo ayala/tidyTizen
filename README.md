@@ -2,11 +2,11 @@
 
 A focused, customizable home screen for Samsung Tizen TVs: six favorite apps, curated artwork, and a pull-down HDMI source tray without Samsung's advertising-heavy launcher.
 
-![tidyTizen with Netflix focused over a Carrie backdrop](docs/images/tidytizen-netflix-carrie.jpg)
+![tidyTizen home screen](docs/images/tidyTizen-home.png)
 
 Press Down to expose the TV's inputs. Names and platform icons can be changed independently for every source.
 
-![tidyTizen showing customized HDMI sources](docs/images/tidytizen-netflix-carrie-sources.jpg)
+![tidyTizen showing customized HDMI sources](docs/images/tidy-Tizen-sources.png)
 
 ## What it does
 
