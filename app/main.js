@@ -118,7 +118,7 @@
     art: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 3 3 2.5-2.5 5 5"/>',
     apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
     arrange: '<path d="M4 8.5h14M15 5.5l3 3-3 3M20 15.5H6M9 12.5l-3 3 3 3"/>',
-    settings: '<path d="m9 3-.6 2.4-2 1.2L4 6l-2 3.5L3.8 11v2L2 14.5 4 18l2.4-.6 2 1.2L9 21h6l.6-2.4 2-1.2 2.4.6 2-3.5-1.8-1.5v-2L22 9.5 20 6l-2.4.6-2-1.2L15 3Z"/><circle cx="12" cy="12" r="3.2"/>',
+    settings: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><circle cx="12" cy="12" r="4"/>',
     home: '<path d="M4 11 12 4.5l8 6.5v8a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1Z"/>',
     undo: '<path d="M9 6 5 10l4 4"/><path d="M5 10h9.5a4.5 4.5 0 0 1 0 9H11"/>',
     check: '<path d="m5.5 12.5 4 4 9-9"/>',
@@ -503,7 +503,7 @@
   }
   function setContent(el, sig, html) {
     sig += '|' + catalog.revision;
-    if (el._sig === sig) return;
+    if (el._sig === sig) return false;
     el._sig = sig; el.innerHTML = html;
     Array.prototype.forEach.call(el.querySelectorAll('[data-native-icon]'), function (img) {
       function ready() { img.parentNode.classList.add('has-native-icon'); }
@@ -511,6 +511,7 @@
       img.onload = ready; img.onerror = failed;
       if (img.complete) { if (img.naturalWidth) ready(); else failed(); }
     });
+    return true;
   }
   function setHTML(el, html) { if (el._html !== html) { el._html = html; el.innerHTML = html; } }
   function attrs(el, z, i, action) { el.setAttribute('data-z', z); el.setAttribute('data-i', String(i)); el.setAttribute('data-action', action); }
@@ -864,6 +865,15 @@
   };
   function listHomeKey(t, k, i, U) {
     var f = t.f, h = S.c.home;
+    if (f.zone === 'inputs') {
+      S.inputFocus = clamp(f.s === undefined ? S.inputFocus : f.s, 0, INPUTS.length - 1); f.s = S.inputFocus;
+      if (k === 'left' && f.s > 0) f.s--;
+      else if (k === 'right' && f.s < INPUTS.length - 1) f.s++;
+      else if (k === 'up' || k === 'back') f.zone = 'apps';
+      else if (k === 'ok') { S.inputFocus = f.s; openInput(f.s); return; }
+      S.inputFocus = f.s;
+      return;
+    }
     if (f.zone === 'util') {
       f.u = clamp(f.u, 0, U.length - 1);
       if (k === 'up' && f.u > 0) f.u--;
@@ -877,6 +887,7 @@
     if (k === 'up' && i > 0) setSel(h[i - 1]);
     else if (k === 'right') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
     else if (k === 'down' && i < h.length - 1) setSel(h[i + 1]);
+    else if (k === 'down' && INPUTS.length) { f.zone = 'inputs'; f.s = clamp(S.inputFocus, 0, INPUTS.length - 1); }
     else if (k === 'back') openMessage('leave');
     else if (k === 'ok') { if (h.length) launch(S.sel); else addAppsRoute(); }
   }
@@ -1475,7 +1486,7 @@
   var sheetEl = $('sheet'), sheetView = $('sheetView');
   var IMG = { photo: $('photo'), mat: $('matImg'), bg: $('sheetBg'), field: $('phFieldImg'), fieldAlt: $('phFieldImgAlt'), utility: $('utFieldImg'), utilityAlt: $('utFieldImgAlt') };
   var sheetKey = '', slotEls = {}, dockEdgeFrame = 0, dockEdgeUntil = 0, dockAnchorCenter = 960;
-  var appliedPalette = null, appliedPhoto = null, appliedFont = null, appliedFontMetrics = null;
+  var appliedPalette = null, appliedPhoto = null, appliedFont = null, appliedFontMetrics = null, appliedStageClass = '';
 
   /* Curated locked palettes keep the existing rendering path exactly. */
   function applyAdaptiveInk(palette) {
@@ -1505,7 +1516,8 @@
   function render() {
     var t = top(), sheet = !!V[t.id].sheet, shown = wall(S.shown ? S.shown.wall : S.c.wall), palette = ADAPTIVE_INK[shown.id];
     var adaptive = applyAdaptiveInk(palette), tr = adaptive && palette.tr ? palette.tr.pol : shown.ut.tr, br = adaptive && palette.br ? palette.br.pol : shown.ut.br;
-    stage.className = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + (t.id === 'appearance' ? ' detail-' + t.group : '') + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (shown.remote ? ' remote-artwork' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '') + (t.id === 'home' && t.f.zone === 'inputs' ? ' sources-open' : '');
+    var stageClass = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + (t.id === 'appearance' ? ' detail-' + t.group : '') + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (shown.remote ? ' remote-artwork' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '') + (t.id === 'home' && t.f.zone === 'inputs' ? ' sources-open' : '');
+    if (stageClass !== appliedStageClass) { stage.className = stageClass; appliedStageClass = stageClass; }
     if (!adaptive && shown.clockInk) stage.style.setProperty('--clock-ink', shown.clockInk);
     else stage.style.removeProperty('--clock-ink');
     if (!adaptive && shown.dockClockInk) stage.style.setProperty('--dock-clock-ink', shown.dockClockInk);
@@ -1785,6 +1797,13 @@
      Reuse the hidden group for the next label; never animate plate width or position. */
   function renderPhotoPlate(id, width, height, y, state) {
     var key = id + '|' + width + '|' + height + '|' + y, plateEl, fieldEl;
+    if (!state) {
+      phFields[photoPlateIndex]._placement = { x: 112, y: y, width: width, height: height };
+      phPlates[0].className = 'ph-plate is-outgoing';
+      phPlates[1].className = 'ph-plate is-outgoing';
+      photoPlateKey = null;
+      return;
+    }
     if (key !== photoPlateKey) {
       phPlates[photoPlateIndex].className = phPlates[photoPlateIndex].className.replace(' is-current', '') + ' is-outgoing';
       photoPlateIndex = 1 - photoPlateIndex;
@@ -1793,7 +1812,6 @@
       plateEl.style.width = width + 'px'; plateEl.style.height = height + 'px';
       plateEl.style.transform = 'translate3d(0,' + y + 'px,0)';
       fieldTransform(fieldEl, 112, y, width, height);
-      plateEl.offsetWidth; // Establish zero opacity before the incoming crossfade.
       photoPlateKey = key;
     }
     fieldTransform(phFields[photoPlateIndex], 112, y, width, height);
@@ -1827,11 +1845,12 @@
       var typography = photoLabel(it.id, compact), focus = rowFocus && i === anchor, lifted = hs.lifted && i === anchor, markImage, body = '';
       if (S.c.apps !== 'text') body += appMark(app(it.id), S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 60 : 84, S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 44 : 64, S.c.apps === 'icons' ? compact ? 52 : 72 : compact ? 42 : 54);
       if (S.c.apps !== 'icons') body += '<span class="ph-name" style="font-size:' + typography.size + 'px;top:' + typography.top + 'px">' + esc(app(it.id).name) + '</span>';
-      setContent(row, it.id + '|' + typography.size + '|' + S.c.bg + '|' + S.c.apps + '|' + homeFont(), '<span class="ph-group">' + body + '</span><span class="ph-move ph-move-up">' + icon('up') + '</span><span class="ph-move ph-move-down">' + icon('down') + '</span>');
-      markImage = row.querySelector('.mark img');
-      if (markImage) {
-        markImage.onerror = function () { this.style.visibility = 'hidden'; };
-        if (markImage.complete && !markImage.naturalWidth) markImage.style.visibility = 'hidden';
+      if (setContent(row, it.id + '|' + typography.size + '|' + S.c.bg + '|' + S.c.apps + '|' + homeFont(), '<span class="ph-group">' + body + '</span><span class="ph-move ph-move-up">' + icon('up') + '</span><span class="ph-move ph-move-down">' + icon('down') + '</span>')) {
+        markImage = row.querySelector('.mark img');
+        if (markImage) {
+          markImage.onerror = function () { this.style.visibility = 'hidden'; };
+          if (markImage.complete && !markImage.naturalWidth) markImage.style.visibility = 'hidden';
+        }
       }
       row.className = 'ph-row k-' + it.kind + (focus ? ' is-focus' : '') + (remembered && i === anchor ? ' is-sel' : '') + (lifted ? ' is-lifted' : '')
         + (lifted && i === 0 ? ' no-up' : '') + (lifted && i === n - 1 ? ' no-down' : '')

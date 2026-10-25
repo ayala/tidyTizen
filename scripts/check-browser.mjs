@@ -371,7 +371,7 @@ try {
         return { widths: rects.map(rect => rect.width), gap: rects.length === 2 ? Math.abs(rects[0].top - rects[1].bottom) : 0,
           focusedWidth: focused?.width || 0, lensWidth: lens?.width || 0 };
       });
-      check('List controls stay compact and separated with ' + apps + ' app treatment', listControls.widths.length === 2 && listControls.widths.every(width => width < 260) && listControls.gap >= 19 && Math.abs(listControls.lensWidth - listControls.focusedWidth) < 1, listControls);
+      check('List controls stay compact and separated with ' + apps + ' app treatment', listControls.widths.length === 2 && listControls.widths.every(width => width < 260) && listControls.gap >= 31 && Math.abs(listControls.lensWidth - listControls.focusedWidth) < 1, listControls);
       await nav('down');
     }
     for (const material of ['soft', 'frost', 'tint']) { await look({ material }); check(material + ' matches displayed bundle', (await state()).shown.material === material && (await state()).look.material === material); }
@@ -996,6 +996,21 @@ try {
     check('Badge, source name and port use a compact vertical rhythm', flags.every(item => item.compact), flags);
     check('The smaller HDMI label retains the raised source-icon alignment', flags.every(item => item.portSize === 18 && item.textOffset >= 3 && item.textOffset <= 4), flags);
     check('Capability flags use the readable charcoal treatment', flags.every(item => /rgba?\(122, 122, 122/.test(item.color) && /rgba?\(28, 28, 28/.test(item.background)), flags);
+  });
+  await run('List opens the same HDMI source tray', async () => {
+    await page();
+    await current.waitForFunction(() => document.querySelectorAll('#inputs .input').length === 4);
+    await look({ layout: 'list', apps: 'text' });
+    await nav(...Array(PRIMARY.length).fill('down'));
+    const sourceTray = await current.evaluate(() => {
+      const stage = document.querySelector('#stage'), inputs = document.querySelector('#inputs');
+      const focused = inputs.querySelector('.input.is-focus');
+      return { open: stage.classList.contains('sources-open'), display: getComputedStyle(inputs).display,
+        visible: getComputedStyle(inputs).visibility, focused: focused && focused.dataset.action };
+    });
+    check('Down from the last List app reveals and focuses Sources', sourceTray.open && sourceTray.display === 'flex' && sourceTray.visible === 'visible' && /^home\.input\./.test(sourceTray.focused || ''), sourceTray);
+    await nav('up');
+    check('Up closes Sources back to the last List app', (await state()).focusAction === 'home.app.xbox' && !(await current.locator('#stage').evaluate(el => el.classList.contains('sources-open'))), await call('where'));
   });
   await run('Physical-key repeats and Back hierarchy', async () => {
     await page(); await editor(); await remove('netflix');
