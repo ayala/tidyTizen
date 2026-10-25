@@ -6,7 +6,7 @@ A focused, customizable home screen for Samsung Tizen TVs: six favorite apps, cu
 
 Press Down to expose the TV's inputs. Names and platform icons can be changed independently for every source.
 
-![tidyTizen showing customized HDMI sources](docs/images/tidy-Tizen-sources.png)
+![tidyTizen showing customized HDMI sources](docs/images/tidyTizen-sources.png)
 
 ## What it does
 
