@@ -1642,6 +1642,22 @@
     else type = 'MOVE';
     playSoftCue(type);
   }
+  var mainNavEdgeTimer = 0;
+  function pulseMainNavEdge(k, before, after) {
+    var cls;
+    if (S.c.layout !== 'dock' || before.view !== 'home' || after.view !== 'home' || before.zone !== 'apps' || after.zone !== 'apps') return;
+    if ((k !== 'left' && k !== 'right') || before.selected !== after.selected || before.focus !== after.focus) return;
+    cls = k === 'left' ? 'edge-left' : 'edge-right';
+    clearTimeout(mainNavEdgeTimer);
+    dock.className = dock.className.replace(/\s+edge-(?:left|right)/g, '');
+    /* Reading width restarts the keyframes when the owner presses the blocked
+       direction repeatedly, matching the native row's elastic end stop. */
+    dock.offsetWidth;
+    dock.className += ' ' + cls;
+    mainNavEdgeTimer = setTimeout(function () {
+      if (dock) dock.className = dock.className.replace(/\s+edge-(?:left|right)/g, '');
+    }, 420);
+  }
   function press(k) {
     norm();
     var before = soundState(), t = top();
@@ -1649,7 +1665,9 @@
     norm();
     render();
     syncRotation();
-    playHomeSound(k, before, soundState());
+    var afterState = soundState();
+    playHomeSound(k, before, afterState);
+    pulseMainNavEdge(k, before, afterState);
   }
 
   /* ---------- Rendering ---------- */
@@ -1894,14 +1912,15 @@
     // Sit 8px above the six-item dock's 96px side-inset baseline.
     return { x: Math.round((1920 - w) / 2), y: 976 - m.th - 32, h: m.th + 32, w: w, shelf: shelfW, vis: vis, broad: broad, empty: n < 0, tw: m.tw, th: m.th, pitch: m.pitch };
   }
-  /* Six centred: the window moves one tile when focus passes an edge. Broad: keep a
-     148px glimpse of the neighbour, as the current dock does. */
+  /* Six complete slots: while more apps remain, keep one full neighbour beyond
+     focus. Moving past position five advances the window by one whole slot;
+     the actual first and last apps may still reach the physical edge. */
   function dockOffset(n, i, g) {
-    var off, left, first, glimpse = g.tw / 2;
+    var off, left, first, reserve = g.pitch;
     if (g.broad) {
       off = scroll.off * g.pitch; left = i * g.pitch;
-      if (left - off < (i > 0 ? glimpse : 0)) off = left - (i > 0 ? glimpse : 0);
-      if (left + g.tw - off > g.shelf - (i < n - 1 ? glimpse : 0)) off = left + g.tw - g.shelf + (i < n - 1 ? glimpse : 0);
+      if (left - off < (i > 0 ? reserve : 0)) off = left - (i > 0 ? reserve : 0);
+      if (left + g.tw - off > g.shelf - (i < n - 1 ? reserve : 0)) off = left + g.tw - g.shelf + (i < n - 1 ? reserve : 0);
       off = clamp(off, 0, Math.max(0, n * g.pitch - 8 - g.shelf));
       if (!S.reflow) { scroll.off = off / g.pitch; scroll.first = Math.round(scroll.off); }
       return off;
