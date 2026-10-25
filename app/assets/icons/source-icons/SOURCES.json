@@ -1,0 +1,27 @@
+{
+  "package": "simple-icons",
+  "version": "11.15.0",
+  "license": "CC0-1.0",
+  "package_url": "https://www.npmjs.com/package/simple-icons/v/11.15.0",
+  "note": "Unmodified official brand-logo shapes, bundled locally and rendered as monochrome masks. Product names and logos remain trademarks of their owners.",
+  "icons": {
+    "hdmi": "User-provided Lucide HDMI-port SVG",
+    "apple": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/apple.svg",
+    "appletv": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/appletv.svg",
+    "amazonfiretv": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/amazonfiretv.svg",
+    "chromecast": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/chromecast.svg",
+    "roku": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/roku.svg",
+    "nvidia": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/nvidia.svg",
+    "playstation": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/playstation.svg",
+    "playstation2": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/playstation2.svg",
+    "playstation3": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/playstation3.svg",
+    "playstation4": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/playstation4.svg",
+    "playstation5": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/playstation5.svg",
+    "xbox": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/xbox.svg",
+    "nintendoswitch": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/nintendoswitch.svg",
+    "wiiu": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/wiiu.svg",
+    "wii": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/wii.svg",
+    "steamdeck": "https://cdn.jsdelivr.net/npm/simple-icons@11.15.0/icons/steamdeck.svg",
+    "samsungtv": "User-provided Samsung TV Plus SVG, normalized for the source icon set"
+  }
+}

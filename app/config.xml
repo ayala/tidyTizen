@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://local.clean-home/app" version="0.1.38" viewmodes="maximized">
+  <tizen:application id="EaQN8Home1.CleanHome" package="EaQN8Home1" required_version="6.0"/>
+  <content src="index.html"/>
+  <name>tidyTizen</name>
+  <icon src="icon.png"/>
+  <access origin="https://api.themoviedb.org" subdomains="true"/>
+  <access origin="https://image.tmdb.org" subdomains="true"/>
+  <access origin="https://www.themoviedb.org" subdomains="true"/>
+  <feature name="http://tizen.org/feature/screen.size.normal.1080.1920"/>
+  <tizen:profile name="tv-samsung"/>
+  <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+  <tizen:privilege name="http://tizen.org/privilege/application.info"/>
+  <tizen:privilege name="http://tizen.org/privilege/internet"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+  <tizen:privilege name="http://tizen.org/privilege/tv.window"/>
+  <tizen:metadata key="http://samsung.com/tv/metadata/prelaunch.support" value="true"/>
+  <tizen:setting screen-orientation="landscape" context-menu="disable" background-support="disable" encryption="disable" install-location="auto" hwkey-event="enable"/>
+</widget>

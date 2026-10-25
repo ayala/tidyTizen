@@ -1,0 +1,44 @@
+[
+  {
+    "icon": "spotify",
+    "source": "https://github.com/simple-icons/simple-icons/blob/develop/icons/spotify.svg",
+    "licence": "CC0-1.0",
+    "note": "Shape unchanged; white fill for launcher."
+  },
+  {
+    "icon": "hbomax",
+    "source": "https://github.com/simple-icons/simple-icons/blob/develop/icons/hbomax.svg",
+    "licence": "CC0-1.0",
+    "note": "Shape unchanged; white fill for launcher."
+  },
+  {
+    "icon": "tubi",
+    "source": "https://github.com/simple-icons/simple-icons/blob/develop/icons/tubi.svg",
+    "licence": "CC0-1.0",
+    "note": "Shape unchanged; white fill for launcher."
+  },
+  {
+    "icon": "plex",
+    "source": "https://github.com/simple-icons/simple-icons/blob/develop/icons/plex.svg",
+    "licence": "CC0-1.0",
+    "note": "Shape unchanged; white fill for launcher."
+  },
+  {
+    "icon": "hulu",
+    "source": "https://github.com/simple-icons/simple-icons/blob/dc63ec43dfef33f81054e1d472270124f1ca40a5/icons/hulu.svg",
+    "licence": "CC0-1.0",
+    "note": "Last pre-removal Simple Icons revision; shape unchanged and rendered as a monochrome mask."
+  },
+  {
+    "icon": "xbox",
+    "source": "https://github.com/simple-icons/simple-icons/blob/ce334b5bda8d8d054cfde7ce35caf40651078a28/icons/xbox.svg",
+    "licence": "CC0-1.0",
+    "note": "Last pre-removal Simple Icons revision; shape unchanged and rendered as a monochrome mask."
+  },
+  {
+    "icon": "nuvio",
+    "source": "user-provided SVG",
+    "licence": "User supplied",
+    "note": "User-provided Nuvio logo geometry, unchanged and rendered as a monochrome mask."
+  }
+]
