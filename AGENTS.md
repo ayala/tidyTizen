@@ -1,8 +1,10 @@
 # tidyTizen
 
-`app/` is the current packaged UI. Read `docs/development.md` and `docs/interaction-behaviour.md` before app changes. For a new contributor or a separate TV installation, also read `docs/for-agents.md`.
+`app/` is the current packaged UI. Read `docs/development.md`, `docs/interaction-behaviour.md`, and `docs/spacing-contract.md` before app changes. For a new contributor or a separate TV installation, also read `docs/for-agents.md`.
 
 Use simple HTML, CSS and ES5-compatible JavaScript for the TV. Node tooling can use modern JavaScript. Preserve remote focus/navigation, preference migrations and cached rendering. Read `docs/assets.md` before changing images, glass geometry or icon sizing; keep live blur and pixel analysis off the TV animation path.
+
+Spacing is a project-wide acceptance requirement, not cosmetic cleanup. Every new or changed composition must give adjacent icons, dots, thumbnails, labels, controls, and sections an explicit visible gutter. Verify rendered edge-to-edge distances in every affected presentation and focus state; a CSS `gap`, padding declaration, or desktop-only glance is not proof. Do not ship elements that touch, nearly touch, overlap, or become cramped after focus scaling. Add or update browser geometry assertions for the affected composition.
 
 Run `npm run check` for app changes. For interaction changes, run the browser preview and `TIDYTIZEN_PUBLIC_FONTS=1 npm run check:browser`; public contributors must not need proprietary fonts. Run `npm run check:public` and `npm run export:public` before preparing a public download. Follow `CONTRIBUTING.md` and retain third-party notices.
 

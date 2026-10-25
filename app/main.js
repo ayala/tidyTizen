@@ -180,6 +180,28 @@
     if (artwork === 'mixed') return selected;
     return [];
   }
+  function primaryBackdrop(w) {
+    var prefix = 'https://image.tmdb.org/t/p/original', path;
+    if (!w || w.src.indexOf(prefix) !== 0) return null;
+    path = w.src.slice(prefix.length);
+    return backdropWall(w, { file_path: path });
+  }
+  function curatorPool() {
+    var mode = S.c && S.c.artwork !== 'scenery' ? S.c.artwork : 'mixed', merged = [], seen = {};
+    wallCollection(S.c && S.c.wall, mode, S.c && S.c.excluded).forEach(function (w) {
+      var candidate = primaryBackdrop(w);
+      if (candidate && !seen[candidate.id]) { seen[candidate.id] = true; merged.push(candidate); }
+    });
+    (S.c && S.c.artworkSelections || []).forEach(function (w) {
+      if (!validArtworkSelection(w) || wallExcluded(w) || seen[w.id]) return;
+      if (mode === 'movies' && w.kind !== 'movie' || mode === 'series' && w.kind !== 'tv') return;
+      seen[w.id] = true; merged.push(prepareArtworkSelection(JSON.parse(JSON.stringify(w))));
+    });
+    return merged;
+  }
+  function curatorSelected(id) {
+    return (S.c.artworkSelections || []).some(function (w) { return w.id === id; });
+  }
   function nextWallId(id, artwork) {
     var modeId = artwork || S.c && S.c.artwork || 'scenery';
     var collection = modeId === 'scenery' ? wallCollection(id, modeId) : selectedCollection(modeId), i;
@@ -247,14 +269,12 @@
   function loadTitleBackdrops(parent, done) {
     var key = parent && parent.id, type, number;
     if (!parent || !parent.remote || !TMDB_KEY) { done([]); return; }
-    if (tmdbImages[key]) { done(titleBackdropsWithSelections(key, tmdbImages[key])); return; }
+    if (tmdbImages[key]) { done(tmdbImages[key].slice()); return; }
     if (tmdbImagesLoading[key]) { tmdbImagesLoading[key].push(done); return; }
     tmdbImagesLoading[key] = [done]; type = parent.kind === 'tv' ? 'tv' : 'movie'; number = parent.id.split('-').pop();
-    tmdbJson(type + '/' + number + '/images?include_image_language=en,null').then(function (body) {
-      var seen = {}, items = (body.backdrops || []).map(function (image) { return backdropWall(parent, image); }).filter(function (w) { if (!w || seen[w.id]) return false; seen[w.id] = true; return true; }).slice(0, 40);
-      if (!items.length) items = [prepareArtworkSelection({ id: 'tmdb-bg-' + type + '-' + number + '-primary', parentId: parent.id, name: parent.name, kind: parent.kind,
-        genres: parent.genres.slice(), originalLanguage: parent.originalLanguage, originCountry: parent.originCountry.slice(), src: parent.src, thumb: parent.thumb })];
-      tmdbImages[key] = items; var callbacks = tmdbImagesLoading[key] || []; delete tmdbImagesLoading[key]; callbacks.forEach(function (callback) { callback(titleBackdropsWithSelections(key, items)); });
+    tmdbJson(type + '/' + number + '/images').then(function (body) {
+      var seen = {}, items = (body.backdrops || []).filter(function (image) { return image.iso_639_1 === null || image.iso_639_1 === undefined; }).map(function (image) { return backdropWall(parent, image); }).filter(function (w) { if (!w || seen[w.id]) return false; seen[w.id] = true; return true; }).slice(0, 20);
+      tmdbImages[key] = items; var callbacks = tmdbImagesLoading[key] || []; delete tmdbImagesLoading[key]; callbacks.forEach(function (callback) { callback(items.slice()); });
     }).catch(function () { var callbacks = tmdbImagesLoading[key] || []; delete tmdbImagesLoading[key]; callbacks.forEach(function (callback) { callback([]); }); });
   }
   function refreshTmdbFeed(force, requestedExclusions) {
@@ -278,11 +298,11 @@
       appendTmdbWalls(walls); tmdbLoading = false; tmdbError = null;
       if (tmdbPendingArtwork) { var pending = tmdbPendingArtwork; tmdbPendingArtwork = null; applyArtwork(pending); return; }
       if (tmdbQueuedExclusions) { var queued = tmdbQueuedExclusions; tmdbQueuedExclusions = null; refreshTmdbFeed(true, queued); return; }
-      if (top().id === 'wallpaper' || top().id === 'appearance') render();
+      if (top().id === 'wallpaper' || top().id === 'appearance' || top().id === 'curator') render();
     }).catch(function (err) {
       tmdbLoading = false; tmdbError = err && err.message || 'Could not update TMDB artwork.';
       if (tmdbQueuedExclusions) { var queued = tmdbQueuedExclusions; tmdbQueuedExclusions = null; refreshTmdbFeed(true, queued); return; }
-      if (top().id === 'wallpaper' || top().id === 'appearance') render();
+      if (top().id === 'wallpaper' || top().id === 'appearance' || top().id === 'curator') render();
     });
   }
   function frostClass(w) { var i = [.12, .20, .30, .36, .44].indexOf(w.frostVeil); return i > 0 ? ' fv-' + (i + 1) : ''; }
@@ -785,6 +805,12 @@
     profile = sourceProfile(input);
     push({ id: 'source', inputIndex: index, editing: false, draft: profile.name, f: { zone: 'name', i: Math.max(0, SOURCE_ICONS.map(function (x) { return x[0]; }).indexOf(profile.icon)) } });
   }
+  function openCurator() {
+    var pool = curatorPool(), index = 0;
+    pool.forEach(function (w, i) { if (w.id === S.c.wall) index = i; });
+    push({ id: 'curator', i: index, currentId: pool[index] ? pool[index].id : null, detail: false, images: [], loading: false, pulse: '', error: null });
+    refreshTmdbFeed(false);
+  }
   function openAppearance(group) {
     var axis = { background: 'bg', layout: 'layout', typography: 'font', focus: 'focus', artwork: 'artwork' }[group];
     var pool = group === 'library' ? artworkLibraryPool() : [];
@@ -829,11 +855,18 @@
       if (S.c.layout === 'list') { listHomeKey(t, k, i, U); return; }
       if (f.zone === 'util') {
         f.u = clamp(f.u, 0, U.length - 1);
-        if (k === x.prev && f.u > 0) f.u--;
+        if (k === 'up') f.zone = 'curate';
+        else if (k === x.prev && f.u > 0) f.u--;
         else if (k === x.next && f.u < U.length - 1) f.u++;
         else if (k === x.inn || k === 'back') f.zone = 'apps';
         else if (k === 'ok') { S.lastUtil = f.u; utilAction(U[f.u]); return; }
         S.lastUtil = f.u;
+        return;
+      }
+      if (f.zone === 'curate') {
+        if (k === 'down') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+        else if (k === 'back') f.zone = 'apps';
+        else if (k === 'ok') openCurator();
         return;
       }
       if (f.zone === 'inputs') {
@@ -856,6 +889,7 @@
     },
     point: function (t, z, i) {
       if (z === 'util') { t.f.zone = 'util'; t.f.u = i; S.lastUtil = i; }
+      else if (z === 'curate-entry') { t.f.zone = 'curate'; }
       else if (z === 'app') { t.f.zone = 'apps'; setSel(S.c.home[i]); }
       else if (z === 'input') { t.f.zone = 'inputs'; t.f.s = i; S.inputFocus = i; }
       else if (z === 'empty') t.f.zone = 'apps';
@@ -877,14 +911,22 @@
     if (f.zone === 'util') {
       f.u = clamp(f.u, 0, U.length - 1);
       if (k === 'up' && f.u > 0) f.u--;
+      else if (k === 'up') f.zone = 'curate';
       else if (k === 'down' && f.u < U.length - 1) f.u++;
       else if (k === 'left' || k === 'back') f.zone = 'apps';
       else if (k === 'ok') { S.lastUtil = f.u; utilAction(U[f.u]); return; }
       S.lastUtil = f.u;
       return;
     }
+    if (f.zone === 'curate') {
+      if (k === 'down') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+      else if (k === 'back') f.zone = 'apps';
+      else if (k === 'ok') openCurator();
+      return;
+    }
     f.zone = 'apps';
     if (k === 'up' && i > 0) setSel(h[i - 1]);
+    else if (k === 'up') f.zone = 'curate';
     else if (k === 'right') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
     else if (k === 'down' && i < h.length - 1) setSel(h[i + 1]);
     else if (k === 'down' && INPUTS.length) { f.zone = 'inputs'; f.s = clamp(S.inputFocus, 0, INPUTS.length - 1); }
@@ -1447,6 +1489,98 @@
       else if (z === 'source-edit-back') pop();
     }
   };
+  function curatorPulse(t, name) {
+    var token = (t.pulseToken || 0) + 1;
+    t.pulseToken = token; t.pulse = name;
+    setTimeout(function () {
+      if (top() !== t || t.pulseToken !== token) return;
+      t.pulse = ''; render();
+    }, REDUCED_MOTION ? 80 : 260);
+  }
+  function curateSelect(t, candidate) {
+    var selections, mode, c;
+    if (!candidate) return;
+    if (curatorSelected(candidate.id)) { curatorPulse(t, 'select'); return; }
+    selections = JSON.parse(JSON.stringify(S.c.artworkSelections || []));
+    selections.push(JSON.parse(JSON.stringify(candidate))); syncSelectedWalls(selections);
+    mode = S.c.artwork === 'scenery' ? 'mixed' : S.c.artwork;
+    curatorPulse(t, 'select');
+    c = next(S.c.home.slice(), S.c.recent.slice()); c.bg = 'photo'; c.wall = candidate.id; c.artwork = mode; c.artworkSelections = selections;
+    if (!write(c, 'Curated artwork')) { syncSelectedWalls(S.c.artworkSelections || []); t.error = 'Couldn’t save this backdrop.'; render(); return; }
+    syncSelectedWalls(selections); t.error = null; render();
+    // Do not prepare Home's seven-image bundle while the user is curating.
+    // The full image, material copies and blurred Settings raster are built
+    // only after leaving the curator, so Left/Right/Up/Down stay responsive.
+  }
+  function curateRemove(t, candidate) {
+    var selections, at = -1, target, c;
+    if (!candidate) return;
+    cancelLook();
+    selections = JSON.parse(JSON.stringify(S.c.artworkSelections || []));
+    selections.forEach(function (w, i) { if (w.id === candidate.id) at = i; });
+    if (at < 0) return;
+    selections.splice(at, 1); curatorPulse(t, 'remove');
+    c = next(S.c.home.slice(), S.c.recent.slice()); c.artworkSelections = selections;
+    if (S.c.wall === candidate.id) { target = selections.length ? selections[0].id : WALLS[0].id; c.wall = target; c.artwork = selections.length ? S.c.artwork : 'scenery'; }
+    if (!write(c, 'Curated artwork')) t.error = 'Couldn’t remove this backdrop.';
+    else { syncSelectedWalls(selections); t.error = null; render(); }
+  }
+  function curatorItems(t) { return t.detail ? t.images || [] : curatorPool(); }
+  function curatorParent(candidate) {
+    var parent = candidate && wall(candidate.parentId);
+    if (parent) return parent;
+    return candidate ? { id: candidate.parentId, name: candidate.name, kind: candidate.kind, genres: candidate.genres.slice(), originalLanguage: candidate.originalLanguage, originCountry: candidate.originCountry.slice(), remote: true, src: candidate.src, thumb: candidate.thumb } : null;
+  }
+  function openCuratorTitle(t, candidate) {
+    var parent = curatorParent(candidate), titleId = candidate && candidate.id;
+    if (!parent || !candidate) return;
+    t.detail = true; t.loading = true; t.parentId = parent.id; t.titleId = titleId;
+    t.images = [candidate]; t.i = 0; t.currentId = candidate.id; t.error = null;
+    loadTitleBackdrops(parent, function (items) {
+      var merged = [], seen = {};
+      items.forEach(function (item) {
+        if (seen[item.id]) return;
+        seen[item.id] = true; merged.push(item);
+      });
+      if (top() !== t || !t.detail || t.parentId !== parent.id) return;
+      merged = merged.slice(0, 20); t.images = merged; t.loading = false; t.i = 0; t.currentId = merged.length ? merged[0].id : null;
+      t.error = merged.length ? null : 'No textless backdrops are available for this title.'; render();
+    });
+  }
+  V.curator = {
+    norm: function (t) {
+      var pool = curatorItems(t), found = -1;
+      pool.forEach(function (w, i) { if (w.id === t.currentId) found = i; });
+      if (!pool.length) { t.i = 0; t.currentId = null; return; }
+      t.i = found >= 0 ? found : clamp(t.i || 0, 0, pool.length - 1);
+      t.currentId = pool[t.i].id;
+    },
+    key: function (t, k) {
+      var pool = curatorItems(t), candidate;
+      if (k === 'back') {
+        if (t.detail) { t.detail = false; t.loading = false; t.images = []; t.currentId = t.titleId; this.norm(t); }
+        else { pop(); setTimeout(restoreLook, 0); }
+        return;
+      }
+      if (!pool.length) { if (k === 'ok') refreshTmdbFeed(true); return; }
+      if (k === 'left' || k === 'right') {
+        t.i = (t.i + (k === 'left' ? -1 : 1) + pool.length) % pool.length;
+        t.currentId = pool[t.i].id; t.error = null; curatorPulse(t, k); return;
+      }
+      candidate = pool[t.i];
+      if (k === 'up') curateSelect(t, candidate);
+      else if (k === 'ok') { if (t.detail) curateSelect(t, candidate); else openCuratorTitle(t, candidate); }
+      else if (k === 'down' && curatorSelected(candidate.id)) curateRemove(t, candidate);
+    },
+    point: function (t, z, i) {
+      if (z === 'curator-option' && t.detail && t.images[i]) { t.i = i; t.currentId = t.images[i].id; return; }
+      if (z !== 'curator') return;
+      if (i === 0) this.key(t, 'left');
+      else if (i === 1) this.key(t, 'right');
+      else if (i === 2) this.key(t, 'up');
+      else if (i === 3) this.key(t, 'down');
+    }
+  };
   function messageContent(t) { return t.content || MSG[t.msg]; }
   V.message = {
     sheet: true,
@@ -1462,18 +1596,37 @@
 
   /* ---------- Dispatch ---------- */
   function norm() { var t = top(), v = V[t.id]; if (v.norm) v.norm(t); }
+  function soundState() {
+    var t = top();
+    return { view: t.id, zone: t.f && t.f.zone || '', focus: JSON.stringify(t.f || {}) };
+  }
+  function playHomeSound(k, before, after) {
+    var type = '', inHome = before.view === 'home' || before.view === 'curator' || after.view === 'home' || after.view === 'curator';
+    if (!inHome || !window.tizen || !tizen.tvaudiocontrol || typeof tizen.tvaudiocontrol.playSound !== 'function') return;
+    if (k === 'ok') type = 'SELECT';
+    else if (k === 'back') type = 'BACK';
+    else if (before.view === after.view && before.zone === after.zone && before.focus === after.focus) return;
+    else if (after.view === 'home' && after.zone === 'inputs' && before.zone !== 'inputs') type = 'DOWN';
+    else if (after.view === 'home' && after.zone === 'curate' && before.zone !== 'curate') type = 'UP';
+    else if (before.zone === 'inputs' || after.zone === 'inputs' || before.view === 'curator' || after.view === 'curator') type = k.toUpperCase();
+    else type = 'MOVE';
+    try { tizen.tvaudiocontrol.playSound(type); } catch (e) { /* Audio feedback is optional on unsupported TVs. */ }
+  }
   function press(k) {
     norm();
-    var t = top();
+    var before = soundState(), t = top();
     V[t.id].key(t, k);
     norm();
     render();
     syncRotation();
+    playHomeSound(k, before, soundState());
   }
 
   /* ---------- Rendering ---------- */
   var $ = function (id) { return document.getElementById(id); };
   var stage = $('stage'), homeEl = $('home'), caption = $('caption'), utilsEl = $('utils'), inputsEl = $('inputs');
+  var curateReveal = $('curateReveal'), curateEntry = $('curateEntry'), curatorEl = $('curator'), curatorImage = $('curatorImage');
+  var curatorTitle = $('curatorTitle'), curatorCount = $('curatorCount'), curatorEmpty = $('curatorEmpty'), curatorOptions = $('curatorOptions'), curatorOptionsTrack = $('curatorOptionsTrack');
   var utilFocusLabel = $('utilFocusLabel'), utilFocusKey = '', appFocusName = $('appFocusName');
   var dock = $('dock'), shelf = $('shelf'), track = $('track'), plate = $('plate'), matScrim = $('matScrim'), dockEmpty = $('dockEmpty');
   var cueL = $('cueL'), cueR = $('cueR'), dockAction = $('dockAction');
@@ -1485,7 +1638,7 @@
   var photoMode = null, photoTransitionToken = 0;
   var sheetEl = $('sheet'), sheetView = $('sheetView');
   var IMG = { photo: $('photo'), mat: $('matImg'), bg: $('sheetBg'), field: $('phFieldImg'), fieldAlt: $('phFieldImgAlt'), utility: $('utFieldImg'), utilityAlt: $('utFieldImgAlt') };
-  var sheetKey = '', slotEls = {}, dockEdgeFrame = 0, dockEdgeUntil = 0, dockAnchorCenter = 960;
+  var sheetKey = '', slotEls = {}, dockEdgeFrame = 0, dockEdgeUntil = 0, dockAnchorCenter = 960, inputRenderKey = '';
   var appliedPalette = null, appliedPhoto = null, appliedFont = null, appliedFontMetrics = null, appliedStageClass = '';
 
   /* Curated locked palettes keep the existing rendering path exactly. */
@@ -1514,18 +1667,19 @@
     }).join('');
   }
   function render() {
-    var t = top(), sheet = !!V[t.id].sheet, shown = wall(S.shown ? S.shown.wall : S.c.wall), palette = ADAPTIVE_INK[shown.id];
+    var t = top(), sheet = !!V[t.id].sheet, curatorView = t.id === 'curator', shown = wall(S.shown ? S.shown.wall : S.c.wall), palette = ADAPTIVE_INK[shown.id];
     var adaptive = applyAdaptiveInk(palette), tr = adaptive && palette.tr ? palette.tr.pol : shown.ut.tr, br = adaptive && palette.br ? palette.br.pol : shown.ut.br;
-    var stageClass = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + (t.id === 'appearance' ? ' detail-' + t.group : '') + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (shown.remote ? ' remote-artwork' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '') + (t.id === 'home' && t.f.zone === 'inputs' ? ' sources-open' : '');
+    var stageClass = 'stage bg-' + S.c.bg + ' l-' + S.c.layout + ' v-' + S.variant + ' m-' + (materialApplies() ? S.c.material : 'none') + ' f-' + S.c.focus + ' a-' + S.c.apps + ' u-' + S.c.controls + ' g-' + S.geom + ' tone-' + shown.tone + ' tr-' + tr + ' br-' + br + wallClasses(shown) + inkRungClasses(palette, adaptive) + ' at-' + t.id + (t.id === 'appearance' ? ' detail-' + t.group : '') + ' font-' + homeFont() + (homeFont() !== 'manrope' ? ' font-custom' : '') + (S.fontSwitch ? ' is-font-switch' : '') + (adaptive ? ' has-adaptive-ink adaptive-tl-' + palette.tl.pol : '') + (!adaptive && shown.clockInk ? ' has-clock-ink' : '') + (!adaptive && shown.dockClockInk ? ' has-dock-clock-ink' : '') + (shown.remote ? ' remote-artwork' : '') + (registeredMaterial(shown.id) ? ' registered-material' : '') + (sheet ? ' is-sheet' : '') + (S.reflow ? ' is-reflow' : '') + (t.id === 'home' && t.f.zone === 'inputs' ? ' sources-open' : '') + (t.id === 'home' && t.f.zone === 'curate' ? ' curate-open' : '');
     if (stageClass !== appliedStageClass) { stage.className = stageClass; appliedStageClass = stageClass; }
     if (!adaptive && shown.clockInk) stage.style.setProperty('--clock-ink', shown.clockInk);
     else stage.style.removeProperty('--clock-ink');
     if (!adaptive && shown.dockClockInk) stage.style.setProperty('--dock-clock-ink', shown.dockClockInk);
     else stage.style.removeProperty('--dock-clock-ink');
     applyHomeFont();
-    if (!sheet) renderHome(t);
+    if (!sheet && !curatorView) renderHome(t);
     renderSheet(t, sheet);
     renderAppearance(t);
+    renderCurator(t);
     renderFocusStatus(t);
   }
 
@@ -1552,11 +1706,50 @@
     if (S.c.layout === 'list') renderList(hs);
     else { photoMode = null; renderDock(hs); }
     renderInputs(t);
+    renderCurateEntry(t);
     renderAppFocusName(hs);
   }
 
+  function renderCurateEntry(t) {
+    var open = t.id === 'home' && t.f.zone === 'curate';
+    curateReveal.setAttribute('aria-hidden', open ? 'false' : 'true');
+    curateEntry.className = 'curate-entry' + (open ? ' is-focus' : '');
+  }
+
+  function renderCurator(t) {
+    var active = t.id === 'curator', pool, candidate, selected, controls, options = '';
+    curatorEl.hidden = !active;
+    if (!active) return;
+    V.curator.norm(t); pool = curatorItems(t); candidate = pool[t.i]; selected = !!candidate && curatorSelected(candidate.id);
+    curatorEl.className = 'curator' + (t.detail ? ' is-detail' : '') + (t.loading ? ' is-loading' : '');
+    curatorImage.style.display = candidate ? 'block' : 'none';
+    if (candidate && curatorImage.src !== candidate.src) curatorImage.src = candidate.src;
+    curatorImage.alt = candidate ? candidate.name : '';
+    curatorTitle.textContent = candidate ? candidate.name : '';
+    curatorCount.textContent = candidate ? (t.detail ? 'Backdrop ' : '') + (t.i + 1) + ' / ' + pool.length : '';
+    curatorEmpty.textContent = candidate ? t.error || (t.loading ? 'Loading backdrop options…' : '') : t.error || (tmdbLoading ? 'Loading the latest TMDB backdrops…' : TMDB_KEY ? 'No backdrops match the current filters. Press OK to refresh.' : 'Add a TMDB API key in Settings to curate backdrops.');
+    if (t.detail) pool.forEach(function (item, i) {
+      options += '<button type="button" tabindex="-1" class="curator-option' + (i === t.i ? ' is-focus' : '') + (curatorSelected(item.id) ? ' is-selected' : '') + '" data-z="curator-option" data-i="' + i + '" data-action="curator.option.' + item.id + '" aria-label="Backdrop ' + (i + 1) + '"><img src="' + esc(item.thumb) + '" alt=""><span class="curator-option-check">' + (curatorSelected(item.id) ? icon('check') : '') + '</span></button>';
+    });
+    setHTML(curatorOptionsTrack, options);
+    curatorOptions.hidden = !t.detail;
+    if (t.detail) curatorOptionsTrack.style.transform = 'translate3d(' + (800 - (t.i * 142 + 63)) + 'px,0,0)';
+    controls = curatorEl.querySelectorAll('.curator-control');
+    Array.prototype.forEach.call(controls, function (el, i) {
+      var remove = i === 3, pulseName = ['left', 'right', 'select', 'remove'][i];
+      el.hidden = remove && !selected;
+      el.className = el.className.replace(/\s+is-focus|\s+is-pulse|\s+is-selected/g, '') + (i === 2 && !t.detail ? ' is-focus' : '') + (t.pulse === pulseName ? ' is-pulse' : '') + (i === 2 && selected ? ' is-selected' : '');
+    });
+  }
+
   function renderInputs(t) {
-    var f = t.id === 'home' ? t.f : { zone: null }, html = '';
+    var f = t.id === 'home' ? t.f : { zone: null }, html = '', renderKey;
+    renderKey = (f.zone || '') + '|' + (f.s === undefined ? '' : f.s) + '|' + INPUTS.map(function (input) {
+      var key = sourceKey(input), profile = sourceProfile(input);
+      return key + ':' + String(S.inputStatus[key]) + ':' + profile.name + ':' + profile.icon;
+    }).join('|');
+    if (renderKey === inputRenderKey) return;
+    inputRenderKey = renderKey;
     INPUTS.forEach(function (input, i) {
       var key = sourceKey(input), connected = S.inputStatus[key] === true, known = S.inputStatus.hasOwnProperty(key), profile = sourceProfile(input);
       var symbol = '<span class="input-symbol">' + sourceIconHtml(profile.icon) + '</span>';
@@ -1600,7 +1793,9 @@
     // Icons-only is intentionally literal: focus is communicated by the icon
     // treatment, without temporarily restoring an All Apps/Settings label.
     renderUtilFocusLabel(null);
-    renderUtilityLens(focused, iconsOnly);
+    // The buttons already carry their 10%/20% glass plates. A second moving
+    // utility lens created a dark duplicate layer, especially on All Apps.
+    renderUtilityLens(null, iconsOnly);
   }
   function renderUtilFocusLabel(button) {
     var text, key, r, sr, scale, width, x;
@@ -1805,10 +2000,10 @@
       return;
     }
     if (key !== photoPlateKey) {
-      phPlates[photoPlateIndex].className = phPlates[photoPlateIndex].className.replace(' is-current', '') + ' is-outgoing';
-      photoPlateIndex = 1 - photoPlateIndex;
+      if (photoPlateKey === null) phPlates[0].className = 'ph-plate is-preparing';
+      phPlates[1].className = 'ph-plate is-outgoing';
+      photoPlateIndex = 0;
       plateEl = phPlates[photoPlateIndex]; fieldEl = phFields[photoPlateIndex];
-      plateEl.className = 'ph-plate is-preparing';
       plateEl.style.width = width + 'px'; plateEl.style.height = height + 'px';
       plateEl.style.transform = 'translate3d(0,' + y + 'px,0)';
       fieldTransform(fieldEl, 112, y, width, height);
@@ -1818,6 +2013,9 @@
     phPlates[photoPlateIndex].className = 'ph-plate is-current' + (state ? ' ' + state : '');
   }
   function fieldTransform(el, x, y, width, height) {
+    var key = [x, y, width, height, S.c.bg === 'photo' && S.c.material === 'tint' && !REDUCED_MOTION].join('|');
+    if (el._transformKey === key) return;
+    el._transformKey = key;
     el._placement = { x: x, y: y, width: width, height: height };
     el.style.transformOrigin = (x + width / 2) + 'px ' + (y + height / 2) + 'px';
     el.style.transform = 'translate3d(' + (-x) + 'px,' + (-y) + 'px,0)' + (S.c.bg === 'photo' && S.c.material === 'tint' && !REDUCED_MOTION ? ' scale(1.04)' : '');
@@ -1842,23 +2040,32 @@
     phList.style.height = PH_HEIGHT + 'px';
     phRows.style.top = (compact ? 72 : 148) + 'px';
     keyed(phRows, items, function (row, it, i) {
-      var typography = photoLabel(it.id, compact), focus = rowFocus && i === anchor, lifted = hs.lifted && i === anchor, markImage, body = '';
-      if (S.c.apps !== 'text') body += appMark(app(it.id), S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 60 : 84, S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 44 : 64, S.c.apps === 'icons' ? compact ? 52 : 72 : compact ? 42 : 54);
-      if (S.c.apps !== 'icons') body += '<span class="ph-name" style="font-size:' + typography.size + 'px;top:' + typography.top + 'px">' + esc(app(it.id).name) + '</span>';
-      if (setContent(row, it.id + '|' + typography.size + '|' + S.c.bg + '|' + S.c.apps + '|' + homeFont(), '<span class="ph-group">' + body + '</span><span class="ph-move ph-move-up">' + icon('up') + '</span><span class="ph-move ph-move-down">' + icon('down') + '</span>')) {
+      var typography, focus = rowFocus && i === anchor, lifted = hs.lifted && i === anchor, markImage, body = '', contentSig, rowClass, layoutSig;
+      contentSig = [it.id, compact, S.c.bg, S.c.apps, homeFont(), catalog.revision].join('|');
+      if (row._listContentSig !== contentSig) {
+        typography = photoLabel(it.id, compact);
+        if (S.c.apps !== 'text') body += appMark(app(it.id), S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 60 : 84, S.c.apps === 'icons' ? compact ? 64 : 88 : compact ? 44 : 64, S.c.apps === 'icons' ? compact ? 52 : 72 : compact ? 42 : 54);
+        if (S.c.apps !== 'icons') body += '<span class="ph-name" style="font-size:' + typography.size + 'px;top:' + typography.top + 'px">' + esc(app(it.id).name) + '</span>';
+        setContent(row, contentSig, '<span class="ph-group">' + body + '</span><span class="ph-move ph-move-up">' + icon('up') + '</span><span class="ph-move ph-move-down">' + icon('down') + '</span>');
+        row._listContentSig = contentSig;
         markImage = row.querySelector('.mark img');
         if (markImage) {
           markImage.onerror = function () { this.style.visibility = 'hidden'; };
           if (markImage.complete && !markImage.naturalWidth) markImage.style.visibility = 'hidden';
         }
       }
-      row.className = 'ph-row k-' + it.kind + (focus ? ' is-focus' : '') + (remembered && i === anchor ? ' is-sel' : '') + (lifted ? ' is-lifted' : '')
+      rowClass = 'ph-row k-' + it.kind + (focus ? ' is-focus' : '') + (remembered && i === anchor ? ' is-sel' : '') + (lifted ? ' is-lifted' : '')
         + (lifted && i === 0 ? ' no-up' : '') + (lifted && i === n - 1 ? ' no-down' : '')
         + (it.kind === 'app' && S.press === it.id ? ' is-press' : '');
-      row.style.width = (compact ? listPlateWidth(it.id, compact) : 1200) + 'px'; row.style.height = pitch + 'px';
-      row.style.transform = 'translate3d(0,' + (i * pitch) + 'px,0)';
-      row.setAttribute('role', 'button'); row.setAttribute('aria-label', app(it.id).name);
-      attrs(row, compact ? 'tile' : 'app', i, compact ? 'arrange.' + (it.kind === 'ph' ? 'placeholder.' : 'tile.') + it.id : 'home.app.' + it.id);
+      if (row.className !== rowClass) row.className = rowClass;
+      layoutSig = [it.id, it.kind, i, compact, pitch, catalog.revision].join('|');
+      if (row._listLayoutSig !== layoutSig) {
+        row._listLayoutSig = layoutSig;
+        row.style.width = (compact ? listPlateWidth(it.id, compact) : 1200) + 'px'; row.style.height = pitch + 'px';
+        row.style.transform = 'translate3d(0,' + (i * pitch) + 'px,0)';
+        row.setAttribute('role', 'button'); row.setAttribute('aria-label', app(it.id).name);
+        attrs(row, compact ? 'tile' : 'app', i, compact ? 'arrange.' + (it.kind === 'ph' ? 'placeholder.' : 'tile.') + it.id : 'home.app.' + it.id);
+      }
     });
     phRows.style.transform = 'translate3d(0,' + (-off) + 'px,0)';
     y = (compact ? PH_COMPACT_TOP + 2 : PH_TOP + 1) + slot * pitch;
@@ -1989,7 +2196,7 @@
      shares its position without changing the control's identity or key behaviour. */
   function renderFocusStatus(t) {
     if (isSettingsDetail(t)) { focusStatus.className = 'focus-status'; return; }
-    var root = isSettingsDetail(top()) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl, active = root.querySelectorAll('.is-focus[data-action]'), target = null, text = S.err ? 'Not saved. OK tries again.' : '', i, r, sr, scale, x, y, w, action, solid, photoRow = false, photoFree = false;
+    var root = actionRoot(), active = root.querySelectorAll('.is-focus[data-action]'), target = null, text = S.err ? 'Not saved. OK tries again.' : '', i, r, sr, scale, x, y, w, action, solid, photoRow = false, photoFree = false;
     Array.prototype.forEach.call(stage.querySelectorAll('.has-local-status'), function (el) { el.className = el.className.replace(/\s+has-local-status/g, ''); });
     for (i = 0; i < active.length; i++) if (renderedAction(active[i])) { target = active[i]; break; }
     if (!text && t.id === 'arrange' && (t.f.zone === 'act' || t.f.zone === 'tiles')) {
@@ -2396,13 +2603,19 @@
   function renderedAction(el) {
     return el.getClientRects().length > 0 && window.getComputedStyle(el).visibility !== 'hidden';
   }
+  function actionRoot() {
+    var t = top();
+    if (t.id === 'curator') return curatorEl;
+    if (t.id === 'home' && t.f.zone === 'curate') return curateReveal;
+    return isSettingsDetail(t) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl;
+  }
   function focusedAction() {
-    var root = isSettingsDetail(top()) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl, els = root.querySelectorAll('.is-focus[data-action]'), i;
+    var root = actionRoot(), els = root.querySelectorAll('.is-focus[data-action]'), i;
     for (i = 0; i < els.length; i++) if (renderedAction(els[i])) return els[i].getAttribute('data-action');
     return null;
   }
   function activate(action) {
-    var root = isSettingsDetail(top()) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl, els = root.querySelectorAll('[data-action]'), i;
+    var root = actionRoot(), els = root.querySelectorAll('[data-action]'), i;
     if (action === 'appearance.bg' && top().id === 'appearance' && top().group === 'background') action = 'background.wallpaper';
     if (action === 'settings.appearance' && top().id === 'settings') action = 'settings.group.background';
     for (i = 0; i < els.length; i++) if (renderedAction(els[i]) && els[i].getAttribute('data-action') === action) { pointAt(els[i]); return true; }
@@ -2481,6 +2694,7 @@
     out.catalog = { loading: catalog.loading, loaded: catalog.loaded, error: catalog.error, ids: ALPHA.slice() };
     out.fonts = { available: LOOK_VALUES.font.slice(), loaded: Object.keys(fontMetrics).filter(function (id) { return !fontMetrics[id].fallback; }), baselineFallback: !!(fontMetrics.manrope && fontMetrics.manrope.fallback), error: S.lookError && S.lookError.type === 'font' ? S.lookError : null };
     out.rotation = { activeMs: activeMs + (activeSince ? Date.now() - activeSince : 0), active: !!activeSince };
+    out.curator = t.id === 'curator' ? { index: t.i, id: t.currentId, count: curatorItems(t).length, selected: curatorSelected(t.currentId), pulse: t.pulse, detail: !!t.detail, loading: !!t.loading, parentId: t.parentId || null } : null;
     out.draft = t.lifted ? { id: t.lifted.id, order: t.lifted.order.slice() } : null;
     out.settingsGroup = t.id === 'wallpaper' ? 'wallpaper' : t.id === 'appearance' ? t.group : null;
     out.focusedChoice = item && item.axis ? { axis: item.axis, value: item.value, action: item.action, disabled: item.disabled } : null;
@@ -2491,16 +2705,16 @@
     return JSON.parse(JSON.stringify(out));
   };
   QA.where = function () {
-    var action = focusedAction(), active = stage.querySelectorAll('.is-focus[data-action]'), count = 0, name = '';
+    var action = focusedAction(), active = actionRoot().querySelectorAll('.is-focus[data-action]'), count = 0, name = '';
     Array.prototype.forEach.call(active, function (el) { if (renderedAction(el)) { count++; if (el.getAttribute('data-action') === action) name = el.getAttribute('aria-label') || el.textContent.replace(/\s+/g, ' ').trim(); } });
-    return { view: top().id, settingsGroup: top().id === 'wallpaper' ? 'wallpaper' : top().id === 'appearance' ? top().group : null, focus: name, focusAction: action, focusCount: count, wallpaper: S.wallShown, zone: top().f.zone || null };
+    return { view: top().id, settingsGroup: top().id === 'wallpaper' ? 'wallpaper' : top().id === 'appearance' ? top().group : null, focus: name, focusAction: action, focusCount: count, wallpaper: S.wallShown, zone: top().f && top().f.zone || null };
   };
   QA.ready = function () { return fontsReady && !S.pending && !!S.shown && S.shown.bg === S.c.bg && S.shown.wall === S.c.wall && S.shown.font === S.c.font; };
   QA.nav = function () { var keys = arguments.length === 1 && Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments); keys.forEach(function (key) { if (!NAV[key]) throw new Error('Unknown key'); press(NAV[key]); }); return QA.state(); };
   QA.look = function (patch) { setLook(patch, {}); return QA.state(); };
   QA.scene = function (name) { if (['home', 'apps', 'settings', 'appearance', 'editor'].indexOf(name) < 0) throw new Error('Unknown view'); goScene(name); return QA.state(); };
   QA.activate = function (action) { return activate(action) ? QA.state() : null; };
-  QA.actions = function () { var view = isSettingsDetail(top()) ? appearanceEl : sheetEl.hidden ? homeEl : sheetEl; return Array.prototype.filter.call(view.querySelectorAll('[data-action]'), renderedAction).map(function (el) { return el.getAttribute('data-action'); }); };
+  QA.actions = function () { var view = actionRoot(); return Array.prototype.filter.call(view.querySelectorAll('[data-action]'), renderedAction).map(function (el) { return el.getAttribute('data-action'); }); };
 
   /* ---------- Start ---------- */
   cueL.innerHTML = icon('left'); cueR.innerHTML = icon('right');

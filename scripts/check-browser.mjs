@@ -67,7 +67,7 @@ function installHarness({ seed, legacy, mock, catalog, minuteMs, artworkMs, cata
   };
   if (noFontAPI) Object.defineProperty(document, 'fonts', { configurable: true, value: undefined });
   if (!mock) return;
-  window.__tv = { catalog, catalogFailure: !!catalogFailure, launchFailure: false, holdCatalog: false, pending: [], calls: [], catalogCalls: 0 };
+  window.__tv = { catalog, catalogFailure: !!catalogFailure, launchFailure: false, holdCatalog: false, pending: [], calls: [], sounds: [], catalogCalls: 0 };
   window.tizen = {
     ApplicationControlData: function (key, value) { this.key = key; this.value = value; },
     ApplicationControl: function (operation, uri, mime, category, data) { Object.assign(this, { operation, uri, mime, category, data }); },
@@ -93,7 +93,8 @@ function installHarness({ seed, legacy, mock, catalog, minuteMs, artworkMs, cata
     tvwindow: {
       setSource(source, ok) { setTimeout(ok, 0); },
       show(ok) { setTimeout(ok, 0); }
-    }
+    },
+    tvaudiocontrol: { playSound(type) { window.__tv.sounds.push(type); } }
   };
 }
 async function page(options = {}) {
@@ -121,7 +122,7 @@ async function page(options = {}) {
       const url = route.request().url();
       current.__tmdbUrls.push(url);
       const body = /\/(?:movie|tv)\/\d+\/images/.test(url)
-        ? { backdrops: Array.from({ length: 17 }, (_, index) => ({ file_path: '/choice-' + (index + 1) + '.jpg', width: 1920, height: 1080, iso_639_1: null })) }
+        ? { backdrops: Array.from({ length: 20 }, (_, index) => ({ file_path: '/choice-' + (index + 1) + '.jpg', width: 1920, height: 1080, iso_639_1: index < 17 ? null : 'en' })) }
         : fixture(url.includes('/tv/') || url.includes('/discover/tv') ? 'tv' : 'movie');
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     });
@@ -360,19 +361,20 @@ try {
     await nav('up');
     const focusedHomeControl = await current.evaluate(() => { const button = document.querySelector('.quiet-utils .u.is-focus'); return button && { action: button.dataset.action, background: getComputedStyle(button).backgroundColor }; });
     check('The focused Home control raises its white tint to twenty percent', focusedHomeControl && focusedHomeControl.background.includes('0.2'), focusedHomeControl);
+    check('Home controls use one glass plate without the obsolete dark utility lens', await current.locator('.ut-lens.is-current').count() === 0, await current.locator('.ut-lens').evaluateAll(nodes => nodes.map(node => node.className)));
     await nav('down');
     for (const apps of ['icons', 'both', 'text']) {
-      await look({ layout: 'list', apps, controls: 'both', focus: 'glass' });
-      await nav('up');
+      await scene('home'); await look({ layout: 'list', apps, controls: 'both', focus: 'glass' });
+      await nav('up', 'down');
       const listControls = await current.evaluate(() => {
         const buttons = [...document.querySelectorAll('.quiet-utils .u')], rects = buttons.map(button => button.getBoundingClientRect());
         const focused = document.querySelector('.quiet-utils .u.is-focus')?.getBoundingClientRect();
         const lens = document.querySelector('.ut-lens.is-current')?.getBoundingClientRect();
-        return { widths: rects.map(rect => rect.width), gap: rects.length === 2 ? Math.abs(rects[0].top - rects[1].bottom) : 0,
+        return { widths: rects.map(rect => rect.width), gap: rects.length === 2 ? Math.max(rects[0].top, rects[1].top) - Math.min(rects[0].bottom, rects[1].bottom) : 0,
           focusedWidth: focused?.width || 0, lensWidth: lens?.width || 0 };
       });
-      check('List controls stay compact and separated with ' + apps + ' app treatment', listControls.widths.length === 2 && listControls.widths.every(width => width < 260) && listControls.gap >= 31 && Math.abs(listControls.lensWidth - listControls.focusedWidth) < 1, listControls);
-      await nav('down');
+      check('List controls keep at least 24px of rendered edge-to-edge separation with ' + apps + ' app treatment', listControls.widths.length === 2 && listControls.widths.every(width => width < 260) && listControls.gap >= 24 && listControls.focusedWidth > 0 && listControls.lensWidth === 0, listControls);
+      await scene('home');
     }
     for (const material of ['soft', 'frost', 'tint']) { await look({ material }); check(material + ' matches displayed bundle', (await state()).shown.material === material && (await state()).look.material === material); }
     const fonts = (await state()).fonts.available; check('Font catalogue includes default', fonts.includes('manrope'));
@@ -439,7 +441,7 @@ try {
     await page();
     await nav('right');
     await current.waitForFunction(() => ShoreQA.state().selected === 'youtube');
-    await nav('up');
+    await nav('up', 'down');
     await act('util.settings');
     await nav('back');
     check('Settings Back returns to the previously focused app', (await state()).view === 'home' && (await state()).focusAction === 'home.app.youtube', await call('where'));
@@ -945,12 +947,57 @@ try {
     await page({ tmdbKey: 'qa-only-key', tmdbFixtures: true, seed: baseline({ artwork: 'movies', artworkSelections: [migratedBackdrop] }) });
     await current.waitForFunction(() => JSON.parse(localStorage.getItem('cleanhome.tmdb.feed.v2') || 'null')?.walls?.length === 6);
     await group('background'); await act('background.artwork'); await act('artwork.movies'); await act('artwork.curate'); await act('artwork.library'); await act('artwork.title.tmdb-movie-101');
-    await current.waitForFunction(() => ShoreQA.actions().includes('artwork.backdrop.tmdb-bg-movie-101-primary'));
-    const migratedChecked = await current.locator('[data-action="artwork.backdrop.tmdb-bg-movie-101-primary"]').getAttribute('aria-checked');
-    check('Previously saved primary artwork is merged into the gallery even when TMDB omits it', migratedChecked === 'true', migratedChecked);
-    await act('artwork.backdrop.tmdb-bg-movie-101-primary');
-    await current.waitForFunction(() => ShoreQA.state().committed.artworkSelections.length === 0);
-    check('An omitted migrated backdrop can be unselected normally', (await stored()).artworkSelections.length === 0, await stored());
+    await current.waitForFunction(() => ShoreQA.actions().some(action => action.startsWith('artwork.backdrop.')));
+    const strictChoices = (await call('actions')).filter(action => action.startsWith('artwork.backdrop.'));
+    check('Backdrop galleries exclude saved or returned language-specific artwork', !strictChoices.includes('artwork.backdrop.tmdb-bg-movie-101-primary') && strictChoices.length === 15 && (await stored()).artworkSelections.length === 1, { strictChoices, stored: await stored() });
+  });
+  await run('Home curator reveals, wraps, selects and conditionally removes', async () => {
+    await page({ tmdbKey: 'qa-only-key', tmdbFixtures: true });
+    await current.waitForFunction(() => JSON.parse(localStorage.getItem('cleanhome.tmdb.feed.v2') || 'null')?.walls?.length === 6);
+    await nav('up');
+    check('Up from the app bar first lands on the existing Home controls', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
+    await nav('up');
+    await current.waitForTimeout(280);
+    const tray = await current.evaluate(() => {
+      const stage = document.getElementById('stage').getBoundingClientRect(), scene = document.getElementById('scene').getBoundingClientRect(), bg = document.querySelector('.bg').getBoundingClientRect(), home = document.getElementById('home').getBoundingClientRect(), dock = document.getElementById('dock').getBoundingClientRect(), icon = document.querySelector('.curate-entry .symbol-image-plus').getBoundingClientRect(), label = document.getElementById('curateLabel').getBoundingClientRect(), entry = document.getElementById('curateEntry'), style = getComputedStyle(entry);
+      return { action: ShoreQA.state().focusAction, zone: ShoreQA.where().zone, sceneTop: scene.top, bgTop: bg.top - stage.top, homeTop: home.top - stage.top, dockBottom: dock.bottom - stage.top, iconGap: label.left - icon.right, label: label.width ? document.getElementById('curateLabel').textContent : '', radius: getComputedStyle(document.getElementById('scene')).borderTopLeftRadius, entryBackground: style.backgroundColor, entryShadow: style.boxShadow, revealHeight: document.getElementById('curateReveal').getBoundingClientRect().height, focusCount: ShoreQA.where().focusCount, sounds: window.__tv.sounds.slice() };
+    });
+    check('Up reveals the compact, unplated curator label with preserved inverse parallax', tray.action === 'home.curate' && tray.zone === 'curate' && Math.abs(tray.sceneTop - 130) < 1 && Math.abs(tray.bgTop - 68) < 1 && Math.abs(tray.homeTop - 152) < 1 && Math.abs(tray.homeTop - tray.bgTop - 84) < 1 && tray.dockBottom <= 1080 && parseFloat(tray.radius) >= 48 && tray.revealHeight === 130 && tray.iconGap >= 23 && tray.label === 'curate your backdrops' && tray.entryBackground === 'rgba(0, 0, 0, 0)' && tray.entryShadow === 'none' && tray.focusCount === 1, tray);
+    check('Home navigation uses native Samsung move audio with a distinct curator-entry cue', tray.sounds[0] === 'MOVE' && tray.sounds[1] === 'UP', tray.sounds);
+    await current.screenshot({ path: out + 'curator-tray.jpg', quality: 92 });
+    await nav('down');
+    check('Down from Curate lands on the existing Home controls instead of skipping them', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
+    await nav('up');
+    await nav('ok'); await current.waitForFunction(() => ShoreQA.state().view === 'curator' && ShoreQA.state().curator.count >= 4);
+    const first = (await state()).curator;
+    await nav('left'); const wrapped = (await state()).curator;
+    check('Left from the first TMDB backdrop wraps to the final backdrop', first.index === 0 && wrapped.index === wrapped.count - 1, { first, wrapped });
+    await nav('right');
+    await nav('up');
+    const immediateSelection = await current.evaluate(() => ({ selected: ShoreQA.state().curator.selected, stored: JSON.parse(localStorage.getItem('cleanhome.qn800a.v1')).artworkSelections.length, pending: ShoreQA.state().pending }));
+    check('Up confirms and saves without starting the expensive Home image transaction', immediateSelection.selected && immediateSelection.stored === 1 && !immediateSelection.pending, immediateSelection);
+    await nav('right'); const advancedImmediately = (await state()).curator; await nav('left');
+    check('Left and Right remain available immediately after selecting', advancedImmediately.index === 1 && !((await state()).pending), advancedImmediately);
+    const selected = await current.evaluate(() => ({ state: ShoreQA.state().curator, trash: !!document.querySelector('.curator-remove:not([hidden])'), stored: JSON.parse(localStorage.getItem('cleanhome.qn800a.v1')).artworkSelections.length, focusCount: ShoreQA.where().focusCount }));
+    check('Up selects the current art and reveals the dynamic trash control', selected.state.selected && selected.trash && selected.stored === 1 && selected.focusCount === 1, selected);
+    await nav('down');
+    const removed = await current.evaluate(() => ({ state: ShoreQA.state().curator, pending: ShoreQA.state().pending, trash: !!document.querySelector('.curator-remove:not([hidden])'), stored: JSON.parse(localStorage.getItem('cleanhome.qn800a.v1')).artworkSelections.length }));
+    check('Down removes selected art immediately without an appearance transaction', !removed.state.selected && !removed.trash && removed.stored === 0 && !removed.pending, removed);
+    await nav('ok'); await current.waitForFunction(() => ShoreQA.state().curator.detail && !ShoreQA.state().curator.loading && ShoreQA.state().curator.count > 1);
+    await current.waitForTimeout(320);
+    const detail = await current.evaluate(() => {
+      const stage = document.getElementById('stage').getBoundingClientRect(), image = document.getElementById('curatorImage').getBoundingClientRect(), options = [...document.querySelectorAll('.curator-option')].map(option => option.getBoundingClientRect());
+      return { state: ShoreQA.state().curator, inset: [image.left - stage.left, image.top - stage.top, stage.right - image.right, stage.bottom - image.bottom], radius: getComputedStyle(document.getElementById('curatorImage')).borderRadius, options: options.length, optionTop: options[0] && options[0].top - stage.top, oneRow: options.every(rect => Math.abs((rect.top + rect.bottom) / 2 - (options[0].top + options[0].bottom) / 2) < 1), focus: ShoreQA.state().focusAction, focusCount: ShoreQA.where().focusCount };
+    });
+    check('OK opens an evenly framed rounded title view with textless-only backdrops in a lowered horizontal strip', detail.state.detail && detail.inset.every(value => Math.abs(value - 72) < 1) && parseFloat(detail.radius) >= 30 && detail.options === 17 && detail.optionTop >= 600 && detail.oneRow && detail.focus.startsWith('curator.option.') && detail.focusCount === 1, detail);
+    check('Title-image requests are filtered from response metadata rather than admitting a language', current.__tmdbUrls.filter(url => /\/(?:movie|tv)\/\d+\/images/.test(url)).every(url => !url.includes('include_image_language=')), current.__tmdbUrls);
+    await current.screenshot({ path: out + 'curator-detail.jpg', quality: 92 });
+    const detailFirst = (await state()).curator; await nav('left'); const detailWrapped = (await state()).curator;
+    check('Title backdrop options also wrap from first to last', detailFirst.index === 0 && detailWrapped.index === detailWrapped.count - 1, { detailFirst, detailWrapped });
+    await nav('back');
+    check('Back first returns from backdrop options to the title browser', (await state()).curator.detail === false, await state());
+    await nav('back');
+    check('Back returns to the still-open curator tray', (await state()).view === 'home' && (await call('where')).zone === 'curate' && (await state()).focusAction === 'home.curate', await state());
   });
   await run('TMDB title library uses three rows without duplicate attribution', async () => {
     const walls = Array.from({ length: 16 }, (_, index) => ({
@@ -1006,9 +1053,10 @@ try {
       const stage = document.querySelector('#stage'), inputs = document.querySelector('#inputs');
       const focused = inputs.querySelector('.input.is-focus');
       return { open: stage.classList.contains('sources-open'), display: getComputedStyle(inputs).display,
-        visible: getComputedStyle(inputs).visibility, focused: focused && focused.dataset.action };
+        visible: getComputedStyle(inputs).visibility, focused: focused && focused.dataset.action, sounds: window.__tv.sounds.slice() };
     });
     check('Down from the last List app reveals and focuses Sources', sourceTray.open && sourceTray.display === 'flex' && sourceTray.visible === 'visible' && /^home\.input\./.test(sourceTray.focused || ''), sourceTray);
+    check('Opening Sources has a distinct native down cue', sourceTray.sounds[sourceTray.sounds.length - 1] === 'DOWN', sourceTray.sounds);
     await nav('up');
     check('Up closes Sources back to the last List app', (await state()).focusAction === 'home.app.xbox' && !(await current.locator('#stage').evaluate(el => el.classList.contains('sources-open'))), await call('where'));
   });

@@ -5,8 +5,12 @@ Manrope, Geist and Newsreader. Complete local Pangram pairs are added directly
 to the widget ZIP; they are never copied into app/.
 """
 from pathlib import Path
+import getpass
 import json
+import os
 import re
+import subprocess
+import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,6 +68,33 @@ def font_overlay(root=ROOT, include_private=True):
     return assets
 
 
+def private_secrets(root=ROOT):
+    """Return a private TMDB bootstrap without ever adding it to source control.
+
+    A normal checkout may use the ignored local-secrets.js file. On macOS the
+    private owner build can instead keep the key in Login Keychain under the
+    tidyTizen-TMDB service, which survives public-source synchronisation.
+    """
+    source = root / 'app/assets/local-secrets.js'
+    if source.is_file():
+        content = source.read_text()
+        match = re.search(r'^\s*window\.CleanHomeSecrets\.tmdbApiKey\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+        if match and re.fullmatch(r'(?:[A-Fa-f0-9]{32}|eyJ[A-Za-z0-9._-]{40,})', match.group(1)):
+            return content.encode()
+    key = os.environ.get('TIDYTIZEN_TMDB_API_KEY', '').strip()
+    if not key and sys.platform == 'darwin':
+        result = subprocess.run(
+            ['security', 'find-generic-password', '-w', '-a', getpass.getuser(), '-s', 'tidyTizen-TMDB'],
+            capture_output=True, text=True)
+        if result.returncode == 0:
+            key = result.stdout.strip()
+    if not re.fullmatch(r'(?:[A-Fa-f0-9]{32}|eyJ[A-Za-z0-9._-]{40,})', key):
+        return None
+    return ("/* Generated only inside the private widget archive. */\n"
+            "window.CleanHomeSecrets = window.CleanHomeSecrets || {};\n"
+            "window.CleanHomeSecrets.tmdbApiKey = " + json.dumps(key) + ";\n").encode()
+
+
 def write_widget_archive(output, root=ROOT, include_private=True):
     """Create an unsigned archive without reading signing or device settings."""
     app = root / 'app'
@@ -81,10 +112,10 @@ def write_widget_archive(output, root=ROOT, include_private=True):
                 continue
             if name not in overlay and is_runtime_source(name):
                 package.write(source, name)
-        secrets = app / 'assets/local-secrets.js'
         example = app / 'assets/local-secrets.example.js'
-        if include_private and secrets.is_file():
-            package.write(secrets, 'assets/local-secrets.js')
+        secrets = private_secrets(root) if include_private else None
+        if secrets:
+            package.writestr('assets/local-secrets.js', secrets)
         else:
             package.write(example, 'assets/local-secrets.js')
         for name, source in sorted(overlay.items()):

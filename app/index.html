@@ -76,6 +76,23 @@
         <nav class="inputs" id="inputs" aria-label="HDMI sources"></nav>
 
         </div>
+        <div class="curate-reveal" id="curateReveal" aria-hidden="true">
+          <button type="button" tabindex="-1" class="curate-entry" id="curateEntry" data-z="curate-entry" data-action="home.curate" aria-label="Curate your backdrops">
+            <span class="curator-symbol symbol-image-plus" aria-hidden="true"></span><span id="curateLabel">curate your backdrops</span>
+          </button>
+        </div>
+        <section class="curator" id="curator" hidden aria-label="Backdrop curator">
+          <img class="curator-image" id="curatorImage" alt="">
+          <div class="curator-shade" aria-hidden="true"></div>
+          <button type="button" tabindex="-1" class="curator-control curator-left is-focus" data-z="curator" data-i="0" data-action="curator.previous" aria-label="Previous backdrop"><span class="curator-symbol symbol-caret symbol-left" aria-hidden="true"></span></button>
+          <button type="button" tabindex="-1" class="curator-control curator-right" data-z="curator" data-i="1" data-action="curator.next" aria-label="Next backdrop"><span class="curator-symbol symbol-caret" aria-hidden="true"></span></button>
+          <button type="button" tabindex="-1" class="curator-control curator-use" data-z="curator" data-i="2" data-action="curator.select" aria-label="Select backdrop"><span class="curator-symbol symbol-caret symbol-up" aria-hidden="true"></span><span class="curator-action-label">Use</span><span class="curator-symbol symbol-check" aria-hidden="true"></span></button>
+          <button type="button" tabindex="-1" class="curator-control curator-remove" data-z="curator" data-i="3" data-action="curator.remove" aria-label="Remove selected backdrop"><span class="curator-symbol symbol-trash" aria-hidden="true"></span><span class="curator-symbol symbol-caret symbol-down" aria-hidden="true"></span></button>
+          <div class="curator-options" id="curatorOptions" aria-label="Backdrop options"><div class="curator-options-track" id="curatorOptionsTrack"></div></div>
+          <p class="curator-title" id="curatorTitle"></p>
+          <p class="curator-count" id="curatorCount"></p>
+          <p class="curator-empty" id="curatorEmpty"></p>
+        </section>
         <section class="appearance" id="appearance" hidden role="dialog" aria-labelledby="appearanceTitle">
           <div class="settings-back" id="appearanceBack"></div>
           <h2 class="settings-title" id="appearanceTitle"></h2>

@@ -8,6 +8,8 @@ Press Down to expose the TV's inputs. Names and platform icons can be changed in
 
 ![tidyTizen showing customized HDMI sources](docs/images/tidyTizen-sources.png)
 
+![tidyTizen compact backdrop curator entry](docs/images/tidyTizen-curator.png)
+
 ## What it does
 
 - Discovers installed Tizen apps and lets you choose and order the apps on Home.

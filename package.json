@@ -1,6 +1,6 @@
 {
   "name": "tidytizen",
-  "version": "0.1.39",
+  "version": "0.1.48",
   "private": true,
   "description": "A customizable, uncluttered Tizen home interface, adapted for a Samsung QN800A.",
   "scripts": {
