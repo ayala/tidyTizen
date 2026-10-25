@@ -954,6 +954,9 @@ try {
   await run('Home curator reveals, wraps, selects and conditionally removes', async () => {
     await page({ tmdbKey: 'qa-only-key', tmdbFixtures: true });
     await current.waitForFunction(() => JSON.parse(localStorage.getItem('cleanhome.tmdb.feed.v2') || 'null')?.walls?.length === 6);
+    await nav('right');
+    check('Left and right movement across the main app bar emits a focus cue', (await state()).focusAction === 'home.app.youtube' && (await call('sounds')).at(-1) === 'MOVE', { focus: (await state()).focusAction, sounds: await call('sounds') });
+    await nav('left');
     await nav('up');
     check('Up from the app bar first lands on the existing Home controls', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
     await nav('up');
@@ -963,7 +966,7 @@ try {
       return { action: ShoreQA.state().focusAction, zone: ShoreQA.where().zone, sceneTop: scene.top, bgTop: bg.top - stage.top, homeTop: home.top - stage.top, dockBottom: dock.bottom - stage.top, iconGap: label.left - icon.right, label: label.width ? document.getElementById('curateLabel').textContent : '', radius: getComputedStyle(document.getElementById('scene')).borderTopLeftRadius, entryBackground: style.backgroundColor, entryShadow: style.boxShadow, revealHeight: document.getElementById('curateReveal').getBoundingClientRect().height, focusCount: ShoreQA.where().focusCount, sounds: ShoreQA.sounds() };
     });
     check('Up reveals the compact, unplated curator label with preserved inverse parallax', tray.action === 'home.curate' && tray.zone === 'curate' && Math.abs(tray.sceneTop - 130) < 1 && Math.abs(tray.bgTop - 68) < 1 && Math.abs(tray.homeTop - 152) < 1 && Math.abs(tray.homeTop - tray.bgTop - 84) < 1 && tray.dockBottom <= 1080 && parseFloat(tray.radius) >= 48 && tray.revealHeight === 130 && tray.iconGap >= 23 && tray.label === 'curate your backdrops' && tray.entryBackground === 'rgba(0, 0, 0, 0)' && tray.entryShadow === 'none' && tray.focusCount === 1, tray);
-    check('Home navigation uses a quiet move cue with a distinct curator-entry pitch', tray.sounds[0] === 'MOVE' && tray.sounds[1] === 'UP', tray.sounds);
+    check('Home navigation uses a soft move cue with a distinct curator-entry pitch', tray.sounds[tray.sounds.length - 2] === 'MOVE' && tray.sounds[tray.sounds.length - 1] === 'UP', tray.sounds);
     await current.screenshot({ path: out + 'curator-tray.jpg', quality: 92 });
     await nav('down');
     check('Down from Curate lands on the existing Home controls instead of skipping them', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));

@@ -1598,15 +1598,15 @@
   function norm() { var t = top(), v = V[t.id]; if (v.norm) v.norm(t); }
   function soundState() {
     var t = top();
-    return { view: t.id, zone: t.f && t.f.zone || '', focus: JSON.stringify(t.f || {}) };
+    return { view: t.id, zone: t.f && t.f.zone || '', focus: JSON.stringify(t.f || {}), selected: S.sel };
   }
   var navAudioContext = null, navSoundLog = [];
   function playSoftCue(type) {
     var AudioEngine = window.AudioContext || window.webkitAudioContext, context, oscillator, gain, now;
     var cue = {
-      MOVE: [500, 0.032, 0.010], UP: [610, 0.040, 0.012], DOWN: [420, 0.040, 0.012],
-      LEFT: [470, 0.034, 0.010], RIGHT: [540, 0.034, 0.010], SELECT: [680, 0.048, 0.014], BACK: [360, 0.044, 0.010]
-    }[type] || [500, 0.032, 0.010];
+      MOVE: [500, 0.036, 0.045], UP: [610, 0.044, 0.055], DOWN: [420, 0.044, 0.055],
+      LEFT: [470, 0.038, 0.048], RIGHT: [540, 0.038, 0.048], SELECT: [680, 0.052, 0.060], BACK: [360, 0.048, 0.045]
+    }[type] || [500, 0.036, 0.045];
     navSoundLog.push(type); if (navSoundLog.length > 40) navSoundLog.shift();
     if (!AudioEngine) return;
     try {
@@ -1625,7 +1625,7 @@
     if (!inHome) return;
     if (k === 'ok') type = 'SELECT';
     else if (k === 'back') type = 'BACK';
-    else if (before.view === after.view && before.zone === after.zone && before.focus === after.focus) return;
+    else if (before.view === after.view && before.zone === after.zone && before.focus === after.focus && before.selected === after.selected) return;
     else if (after.view === 'home' && after.zone === 'inputs' && before.zone !== 'inputs') type = 'DOWN';
     else if (after.view === 'home' && after.zone === 'curate' && before.zone !== 'curate') type = 'UP';
     else if (before.zone === 'inputs' || after.zone === 'inputs' || before.view === 'curator' || after.view === 'curator') type = k.toUpperCase();
