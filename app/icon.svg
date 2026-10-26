@@ -1,17 +1,2 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 36.74 36.74">
-  <defs>
-    <style>
-      .cls-1{fill:url(#radial-gradient);}
-      .cls-2{fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.25px;}
-      .cls-3{fill:#fff;}
-    </style>
-    <radialGradient id="radial-gradient" cx="31.69" cy="43.55" fx="31.69" fy="43.55" r="69.92" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#002c76"/>
-      <stop offset="1" stop-color="#000816"/>
-    </radialGradient>
-  </defs>
-  <rect class="cls-1" width="36.74" height="36.74"/>
-  <path class="cls-2" d="M14.87,26.81h-3.5c-1.1,0-2-.9-2-2v-9c0-.59.26-1.15.71-1.53l7-6c.75-.63,1.84-.63,2.58,0l7,6c.45.38.71.94.71,1.53v9c0,1.1-.9,2-2,2h-5c-1.1,0-2-.9-2-2v-2"/>
-  <circle class="cls-3" cx="18.33" cy="18" r="1.37"/>
-</svg>
+<svg id="Layer_2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38.25 38.25"><defs><style>.cls-1{fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.25px;}.cls-2{fill:#0d1128;}</style></defs><g id="Layer_1-2"><rect class="cls-2" width="38.25" height="38.25"/><circle class="cls-1" cx="19.12" cy="19.12" r="1"/><circle class="cls-1" cx="19.12" cy="19.12" r="10"/></g></svg>

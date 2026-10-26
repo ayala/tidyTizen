@@ -120,6 +120,8 @@
     arrange: '<path d="M4 8.5h14M15 5.5l3 3-3 3M20 15.5H6M9 12.5l-3 3 3 3"/>',
     settings: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><circle cx="12" cy="12" r="4"/>',
     home: '<path d="M4 11 12 4.5l8 6.5v8a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1Z"/>',
+    exitStay: '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+    exitHome: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
     undo: '<path d="M9 6 5 10l4 4"/><path d="M5 10h9.5a4.5 4.5 0 0 1 0 9H11"/>',
     check: '<path d="m5.5 12.5 4 4 9-9"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -538,7 +540,7 @@
 
   /* ---------- Saved preferences ---------- */
   function safeId(id) { return typeof id === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,160}$/.test(id) && ['constructor', 'prototype', '__proto__'].indexOf(id) < 0; }
-  function localBrand(id) { return id === 'Z6by5zQeIi.TizenIPTV' || id === 'EaIPTVN001.App' ? 'tizeniptv' : ''; }
+  function localBrand(id) { return id === 'Z6by5zQeIi.TizenIPTV' || id === 'EaIPTVN001.App' ? 'tizeniptv' : id === 'org.tizen.ambientapp' ? 'ambient' : ''; }
   function safeIcon(path) { return typeof path === 'string' && path.length < 2048 && /^(?:\/[^\/]|file:\/\/\/|wgt-package:\/\/\/)/.test(path) ? path : ''; }
   function load() {
     var keys = [KEY, 'cleanframe.shore.v1'], raw, saved, i;
@@ -562,7 +564,7 @@
       var brand;
       if (!a || !safeId(a.id) || !safeId(a.appId) || typeof a.name !== 'string' || !a.name.trim() || app(a.id)) return;
       brand = localBrand(a.appId) || a.brand;
-      APPS.push({ id: a.id, appId: a.appId, name: a.name.slice(0, 160), brand: ['hbomax', 'spotify', 'tubi', 'nuvio', 'tizeniptv'].indexOf(brand) >= 0 ? brand : '', mark: ['hbomax', 'spotify', 'tubi', 'tizeniptv'].indexOf(brand) >= 0, icon: safeIcon(a.icon) });
+      APPS.push({ id: a.id, appId: a.appId, name: a.name.slice(0, 160), brand: ['hbomax', 'spotify', 'tubi', 'nuvio', 'tizeniptv', 'ambient'].indexOf(brand) >= 0 ? brand : '', mark: ['hbomax', 'spotify', 'tubi', 'tizeniptv', 'ambient'].indexOf(brand) >= 0, icon: safeIcon(a.icon) });
     });
     (Array.isArray(s.home) ? s.home : Array.isArray(s.dock) ? s.dock : []).forEach(function (id) {
       if (!safeId(id) || h.indexOf(id) >= 0 || h.length >= CAP) return;
@@ -751,8 +753,13 @@
     return write(c, 'Reset ' + sourcePort(input));
   }
   function openInput(index) {
-    var input = INPUTS[index];
+    var input = INPUTS[index], home;
     if (!input || busy) return;
+    /* The source tray is transient. Collapse it before handing control to the
+       TV so a warm return resumes at the last app instead of reopening HDMI. */
+    home = S.stack[0];
+    if (home && home.id === 'home') home.f.zone = 'apps';
+    render(); syncRotation();
     perform(sourceProfile(input).name, function (done) { FrameDevice.openSource(input.type, input.number, done); });
   }
   function refreshCatalog() {
@@ -1038,7 +1045,7 @@
 
   /* ---------- Installed apps ---------- */
   function appsItems() { return catalog.error ? [] : ALPHA; }
-  function appsHead() { return catalog.error ? [['retry', 'Try again', '', '']] : [['editor', 'Apps on Home', '', 'home']]; }
+  function appsHead() { return catalog.error ? [['retry', 'Try again', '', '']] : [['editor', 'Home', '', 'home']]; }
   V.apps = {
     sheet: true,
     norm: function (t) {
@@ -1598,8 +1605,8 @@
       var A = messageContent(t).actions, a;
       if (k === 'left') t.f.b = Math.max(0, t.f.b - 1);
       else if (k === 'right') t.f.b = Math.min(A.length - 1, t.f.b + 1);
-      else if (k === 'back') pop();
-      else if (k === 'ok') { a = A[t.f.b][0]; pop(); if (a === 'samsung') perform('Samsung Home', FrameDevice.home); }
+      else if (k === 'back') { pop(); if (t.msg === 'leave') deferHomeRestore = true; }
+      else if (k === 'ok') { a = A[t.f.b][0]; pop(); if (a === 'stay') deferHomeRestore = true; if (a === 'samsung') perform('Samsung Home', FrameDevice.home); }
     },
     point: function (t, z, i) { if (z === 'act') { t.f.b = i; this.key(t, 'ok'); } }
   };
@@ -1610,13 +1617,13 @@
     var t = top();
     return { view: t.id, zone: t.f && t.f.zone || '', focus: JSON.stringify(t.f || {}), selected: S.sel };
   }
-  var navAudioContext = null, navSoundLog = [];
+  var navAudioContext = null, navSoundLog = [], deferHomeRestore = false;
   function playSoftCue(type) {
     var AudioEngine = window.AudioContext || window.webkitAudioContext, context, oscillator, gain, now;
     var cue = {
       MOVE: [500, 0.036, 0.045], UP: [610, 0.044, 0.055], DOWN: [420, 0.044, 0.055],
       LEFT: [470, 0.038, 0.048], RIGHT: [540, 0.038, 0.048], SELECT: [680, 0.052, 0.060], BACK: [360, 0.048, 0.045],
-      EDGE: [118, 0.078, 0.030]
+      EDGE: [118, 0.078, 0.104]
     }[type] || [500, 0.036, 0.045];
     navSoundLog.push(type); if (navSoundLog.length > 40) navSoundLog.shift();
     if (!AudioEngine) return;
@@ -1637,8 +1644,7 @@
     if (k === 'ok') type = 'SELECT';
     else if (k === 'back') type = 'BACK';
     else if (before.view === after.view && before.zone === after.zone && before.focus === after.focus && before.selected === after.selected) return;
-    else if (after.view === 'home' && after.zone === 'inputs' && before.zone !== 'inputs') type = 'DOWN';
-    else if (after.view === 'home' && after.zone === 'curate' && before.zone !== 'curate') type = 'UP';
+    else if (after.view === 'home' && (after.zone === 'inputs' || after.zone === 'curate') && before.zone !== after.zone) type = 'DOWN';
     else if (before.zone === 'inputs' || after.zone === 'inputs' || before.view === 'curator' || after.view === 'curator') type = k.toUpperCase();
     else type = 'MOVE';
     playSoftCue(type);
@@ -1658,15 +1664,20 @@
     if (S.c.uiAudio !== 'off') playSoftCue('EDGE');
     mainNavEdgeTimer = setTimeout(function () {
       if (dock) dock.className = dock.className.replace(/\s+edge-(?:left|right)/g, '');
-    }, 420);
+    }, 560);
   }
   function press(k) {
     norm();
-    var before = soundState(), t = top();
+    var before = soundState(), t = top(), defer;
     V[t.id].key(t, k);
     norm();
-    render();
-    syncRotation();
+    defer = deferHomeRestore; deferHomeRestore = false;
+    if (defer) {
+      /* Reveal the retained Home immediately and reconcile its heavier DOM on
+         the following frame, so Stay never waits on a full Home render. */
+      sheetEl.hidden = true; sheetView.hidden = true; sceneEl.setAttribute('aria-hidden', 'false');
+      window.requestAnimationFrame(function () { render(); syncRotation(); });
+    } else { render(); syncRotation(); }
     var afterState = soundState();
     playHomeSound(k, before, afterState);
     pulseMainNavEdge(k, before, afterState);
@@ -2312,6 +2323,7 @@
     },
     message: function (t) {
       var m = messageContent(t);
+      if (t.msg === 'leave') return '<div class="exit-message"><p class="exit-message-line" aria-label="' + esc(m.line) + '"><span>Go back</span><span class="exit-message-connector">or open</span><span>Samsung Home</span></p><div class="msg-acts exit-message-acts" data-slot="acts"></div></div>';
       return '<h2 class="msg-title">' + esc(m.title) + '</h2><p class="msg-line">' + esc(m.line) + '</p><p class="msg-note">' + esc(m.note) + '</p><div class="msg-acts" data-slot="acts"></div>';
     }
   };
@@ -2440,6 +2452,7 @@
     },
     message: function (t, el) {
       setHTML(el.acts, messageContent(t).actions.map(function (a, i) {
+        if (t.msg === 'leave') return '<button type="button" tabindex="-1" class="exit-choice' + (i === t.f.b ? ' is-focus' : '') + '" data-z="act" data-i="' + i + '" data-action="message.' + a[0] + '" aria-label="' + esc(a[1]) + '">' + icon(a[0] === 'stay' ? 'exitStay' : 'exitHome') + '</button>';
         return '<button type="button" tabindex="-1" class="btn' + (i === t.f.b ? ' is-focus' : '') + '" data-z="act" data-i="' + i + '" data-action="message.' + a[0] + '"><span>' + a[1] + '</span></button>';
       }).join(''));
     }

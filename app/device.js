@@ -12,9 +12,9 @@
   var STREAMING = ['as6cYRgkPy.Binge', '73iTZRTc34.Stan', '5b8c3eb16b.BeamCTVDev',
     'KaLitts8bq.tenplaySamsungTizen', 'eYuOiOLYQX.KayoSports', 'Ne2ZsPWdKl.9NOW',
     '3KA0pm7a7V.TubiTV', 'rJeHak5zRg.Spotify', 'NuvioTV001.NuvioTV', 'icp4AvUPiA.7plus'];
-  var CONSUMER_SYSTEM = ['org.tizen.browser', 'com.microsoft.copilot'];
+  var CONSUMER_SYSTEM = ['org.tizen.browser', 'com.microsoft.copilot', 'org.tizen.ambientapp'];
   var EXTRA_BRANDS = {'rJeHak5zRg.Spotify': 'spotify', 'NuvioTV001.NuvioTV': 'nuvio', '5b8c3eb16b.BeamCTVDev': 'hbomax', '3KA0pm7a7V.TubiTV': 'tubi',
-    'Z6by5zQeIi.TizenIPTV': 'tizeniptv', 'EaIPTVN001.App': 'tizeniptv'};
+    'Z6by5zQeIi.TizenIPTV': 'tizeniptv', 'EaIPTVN001.App': 'tizeniptv', 'org.tizen.ambientapp': 'ambient'};
   var INTERNAL = ['adplatform.ADPlayer', 'WykOS4t4F0.cmsWebApp', '25emanual3.emanual',
     'ZODRT12q2l.WebAccountExtension', 'ByJlgt0XeD.CastSettingsApp', 'tv6pbVMQFF.PrivacyChoices'];
   var SELF = 'EaQN8Home1.CleanHome';
@@ -88,12 +88,13 @@
         Object.keys(IDS).forEach(function (brand) { known[IDS[brand]] = brand; });
         list.forEach(function (a) {
           var primary = !!known[a.id], stream = STREAMING.indexOf(a.id) >= 0;
-          var consumer = /^[A-Za-z0-9]{10}\.[A-Za-z0-9_-]+$/.test(a.id) || CONSUMER_SYSTEM.indexOf(a.id) >= 0;
-          if (a.id === SELF || INTERNAL.indexOf(a.id) >= 0 || seen[a.id] || !a.name || (!primary && !stream && (!a.show || !consumer))) return;
+          var explicitSystem = CONSUMER_SYSTEM.indexOf(a.id) >= 0;
+          var consumer = /^[A-Za-z0-9]{10}\.[A-Za-z0-9_-]+$/.test(a.id) || explicitSystem;
+          if (a.id === SELF || INTERNAL.indexOf(a.id) >= 0 || seen[a.id] || !a.name || (!primary && !stream && !explicitSystem && (!a.show || !consumer))) return;
           if (!primary && /(?:service|worker|preview|promotion|plugin|launcher|test|sdk|^ep[ -]|factory|daemon)/i.test(a.name + ' ' + a.id)) return;
           if (/-dummy$/.test(a.id) || a.id === 'com.samsung.tv.cobalt-yt') return;
           seen[a.id] = true;
-          result.push({ appId: a.id, name: a.name, brand: known[a.id] || EXTRA_BRANDS[a.id] || '', icon: a.iconPath || '', rank: primary ? Object.keys(IDS).indexOf(known[a.id]) : (stream ? 20 : 30) });
+          result.push({ appId: a.id, name: a.id === 'org.tizen.ambientapp' ? 'Ambient Mode' : a.name, brand: known[a.id] || EXTRA_BRANDS[a.id] || '', icon: a.iconPath || '', rank: primary ? Object.keys(IDS).indexOf(known[a.id]) : (stream ? 20 : 30) });
         });
         result.sort(function (a, b) { return a.rank - b.rank || a.name.toLowerCase().localeCompare(b.name.toLowerCase()); });
         finish(null, result);

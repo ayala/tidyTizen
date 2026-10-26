@@ -40,11 +40,5 @@
     "source": "user-provided SVG",
     "licence": "User supplied",
     "note": "User-provided Nuvio logo geometry, unchanged and rendered as a monochrome mask."
-  },
-  {
-    "icon": "image-plus",
-    "source": "user-provided SVG",
-    "licence": "User supplied",
-    "note": "User-provided image-plus outline, unchanged and rendered as a monochrome mask."
   }
 ]

@@ -8,16 +8,19 @@ const PRIMARY = ['netflix', 'youtube', 'plex', 'nuvio', 'primevideo', 'disneyplu
 const IDS = ['org.tizen.netflix-app', '9Ur5IzDKqV.TizenYouTube', 'kIciSQlYEM.plex', 'NuvioTV001.NuvioTV', 'org.tizen.primevideo', 'MCmYXNxgcu.DisneyPlus', 'LBUAQX1exg.Hulu', 'com.samsung.tv.aria-video', 'GHI3a0zMSx.XboxGamePass'];
 const NAMES = ['Netflix', 'YouTube', 'Plex', 'Nuvio TV', 'Prime Video', 'Disney+', 'Hulu', 'Apple TV', 'Xbox'];
 const EXTRA = 'AbCdEf1234.FamilyApp', SPOTIFY = 'rJeHak5zRg.Spotify';
+const AMBIENT = 'org.tizen.ambientapp';
 const UNSAFE_NAME = 'Family <img src=x onerror="window.__catalogXss=1"> & TV';
 const CATALOG = IDS.map((id, i) => ({ id, name: NAMES[i], show: true, iconPath: '' })).concat([
   { id: EXTRA, name: UNSAFE_NAME, show: true, iconPath: '' },
   { id: SPOTIFY, name: 'Spotify', show: true, iconPath: '' },
   { id: '5b8c3eb16b.BeamCTVDev', name: 'HBO Max', show: true, iconPath: '' },
+  { id: AMBIENT, name: 'Ambient', show: false, iconPath: '' },
   { id: 'EaQN8Home1.CleanHome', name: 'Clean Home', show: true },
   { id: 'AbCdEf1234.worker', name: 'Background worker', show: true },
   { id: 'com.samsung.tv.cobalt-yt', name: 'YouTube', show: true }
 ]);
 const walls = JSON.parse(readFileSync(root + 'app/assets/wallpapers/SOURCES.json', 'utf8'));
+const mainSource = readFileSync(root + 'app/main.js', 'utf8');
 const out = root + '.local/qa/';
 mkdirSync(out, { recursive: true });
 const sourceFiles = ['app/main.js', 'app/device.js', 'app/index.html', 'app/style.css', 'app/config.xml', 'app/assets/wallpapers/SOURCES.json', 'app/assets/wallpapers/catalog.js', 'app/assets/adaptive-ink.js', 'app/assets/icons/metrics.js'];
@@ -266,7 +269,18 @@ try {
   await run('Real catalogue and native launch boundary', async () => {
     await page(); await library();
     const names = await current.locator('[data-action^="apps.open."] .label').allTextContents();
-    check('Consumer catalogue excludes services, self and duplicate YouTube', names.length === 12 && names.filter(n => n === 'YouTube').length === 1 && !names.includes('Clean Home') && !names.includes('Background worker'), names);
+    check('Consumer catalogue excludes services, self and duplicate YouTube', names.length === 13 && names.filter(n => n === 'YouTube').length === 1 && !names.includes('Clean Home') && !names.includes('Background worker'), names);
+    check('Ambient Mode remains visible despite its system visibility flag', names.includes('Ambient Mode'), names);
+    const allAppsGeometry = await current.evaluate(ambient => {
+      const header = document.querySelector('[data-action="apps.editor"]'), headerIcon = header && header.querySelector('.ico'), headerLabel = header && header.querySelector('span');
+      const ambientTile = document.querySelector('[data-action="apps.open.' + ambient + '"]'), ambientIcon = ambientTile && ambientTile.querySelector('[data-mark="ambient"] .mk, [data-mark="ambient"] img[src*="ambient.svg"]');
+      const onHome = document.querySelector('[data-action="apps.open.netflix"]'), badge = onHome && onHome.querySelector('.badge'), state = onHome && onHome.querySelector('.state'), stateLabel = state && state.querySelector('span');
+      const hi = headerIcon && headerIcon.getBoundingClientRect(), hl = headerLabel && headerLabel.getBoundingClientRect(), br = badge && badge.getBoundingClientRect();
+      const tr = stateLabel && stateLabel.getBoundingClientRect();
+      return { header: header && header.textContent.trim(), headerGap: hi && hl ? hl.left - hi.right : -1, ambientLeaf: !!ambientIcon,
+        onHomeGap: br && tr ? tr.left - br.right : -1 };
+    }, AMBIENT);
+    check('All Apps restores Home copy, leaf artwork, and explicit icon/checkmark gutters', allAppsGeometry.header === 'Home' && allAppsGeometry.headerGap >= 24 && allAppsGeometry.ambientLeaf && allAppsGeometry.onHomeGap >= 20, allAppsGeometry);
     check('Installed names stay text, including HTML punctuation', names.includes(UNSAFE_NAME) && !(await current.evaluate(() => window.__catalogXss)));
     check('Exploration fixtures do not appear', !names.includes('Jellyfin'));
     await act('apps.open.' + SPOTIFY); await current.waitForFunction(() => __tv.calls.length > 0);
@@ -286,7 +300,7 @@ try {
     check('Catalogue failure leaves Home intact', same((await state()).dock, PRIMARY));
     await current.evaluate(() => { __tv.catalogFailure = false; }); await act('apps.retry');
     await current.waitForSelector('[data-action="apps.open.' + EXTRA + '"]');
-    check('Retry displays real installed names', (await current.locator('[data-action^="apps.open."]').count()) === 12);
+    check('Retry displays real installed names', (await current.locator('[data-action^="apps.open."]').count()) === 13);
   });
   await run('Native icon and failed-image fallback', async () => {
     await page({ catalog: CATALOG.map(a => a.id === EXTRA ? { ...a, iconPath: '/home/assets/icons/netflix.svg' } : a) });
@@ -357,12 +371,13 @@ try {
     for (const axis of ['apps', 'controls']) for (const value of ['icons', 'both', 'text']) { await look({ [axis]: value }); check(axis + ' ' + value + ' persists', (await state()).look[axis] === value); }
     await look({ bg: 'photo', layout: 'dock', focus: 'glass', apps: 'both', controls: 'icons' });
     const homeControls = await current.evaluate(() => [...document.querySelectorAll('.quiet-utils .u')].map(button => ({ action: button.dataset.action, background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow, radius: getComputedStyle(button).borderRadius })));
-    check('All Apps and Settings carry the shared glass material', homeControls.length === 2 && homeControls.every(button => button.background !== 'none' && button.shadow !== 'none' && button.radius === '32px'), homeControls);
+    const homePlateColors = await current.evaluate(() => [...document.querySelectorAll('.quiet-utils .u')].map(button => getComputedStyle(button).backgroundColor));
+    check('All Apps and Settings retain their readable 10% white plates', homeControls.length === 2 && homeControls.every(button => button.radius === '32px') && homePlateColors.every(color => color === 'rgba(255, 255, 255, 0.1)'), { homeControls, homePlateColors });
     await nav('up');
-    const focusedHomeControl = await current.evaluate(() => { const button = document.querySelector('.quiet-utils .u.is-focus'); return button && { action: button.dataset.action, background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow }; });
-    check('The focused Home control raises the shared glass material', focusedHomeControl && focusedHomeControl.background !== 'none' && focusedHomeControl.shadow !== 'none', focusedHomeControl);
+    const focusedHomeControl = await current.evaluate(() => { const button = document.querySelector('.quiet-utils .u.is-focus'); return button && { action: button.dataset.action, background: getComputedStyle(button).backgroundColor, shadow: getComputedStyle(button).boxShadow }; });
+    check('The focused Home control raises to its readable 20% white plate', focusedHomeControl && focusedHomeControl.background === 'rgba(255, 255, 255, 0.2)', focusedHomeControl);
     const curatorControls = await current.evaluate(() => [...document.querySelectorAll('.curator-control')].map(button => ({ background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow })));
-    check('Curator controls use the same glass material family', curatorControls.length === 4 && curatorControls.every(button => button.background !== 'none' && button.shadow !== 'none'), curatorControls);
+    check('Curator controls retain their prior high-contrast gradient treatment', curatorControls.length === 4 && curatorControls.every(button => button.background !== 'none' && button.shadow !== 'none'), curatorControls);
     check('Home controls use one glass plate without the obsolete dark utility lens', await current.locator('.ut-lens.is-current').count() === 0, await current.locator('.ut-lens').evaluateAll(nodes => nodes.map(node => node.className)));
     await nav('down');
     for (const apps of ['icons', 'both', 'text']) {
@@ -407,6 +422,7 @@ try {
     await page(); await scene('settings');
     const expected = ['settings.group.background', 'settings.group.layout', 'settings.group.typography', 'settings.group.focus', 'settings.editor', 'settings.group.samsung'];
     check('Overview has all six settings groups', same((await call('actions')).filter(a => expected.includes(a)).sort(), expected.slice().sort()));
+    check('Focus overview subline identifies UI Style and Sound', (await current.locator('[data-action="settings.group.focus"]').innerText()).includes('UI Style + Sound'), await current.locator('[data-action="settings.group.focus"]').innerText());
     const specs = {
       background: { bg: ['dark', 'light', 'photo'] },
       layout: { layout: ['list', 'dock'], apps: ['icons', 'both', 'text'], controls: ['icons', 'both', 'text'] },
@@ -977,9 +993,10 @@ try {
     await nav('left');
     const homeCount = (await state()).committed.home.length;
     await nav(...Array(homeCount + 1).fill('left'));
-    const leftEdge = await current.evaluate(() => { const tiles = document.querySelectorAll('#track .tile .tile-content'), state = ShoreQA.state(); return { cls: document.getElementById('dock').className, animation: tiles.length ? getComputedStyle(tiles[0]).animationName : '', focus: state.focusAction, expected: 'home.app.' + state.committed.home[0] }; });
-    check('Blocked Left gives the Dock icons an inward elastic end response with a bass edge cue', leftEdge.cls.includes('edge-left') && leftEdge.animation === 'dock-edge-left' && leftEdge.focus === leftEdge.expected && (await call('sounds')).at(-1) === 'EDGE', { ...leftEdge, sounds: await call('sounds') });
-    await current.waitForTimeout(460);
+    const leftEdge = await current.evaluate(() => { const tiles = [...document.querySelectorAll('#track .tile .tile-content')], state = ShoreQA.state(); return { cls: document.getElementById('dock').className, animation: tiles.length ? getComputedStyle(tiles[0]).animationName : '', delays: tiles.slice(0, 6).map(tile => getComputedStyle(tile).animationDelay), focus: state.focusAction, expected: 'home.app.' + state.committed.home[0] }; });
+    check('Blocked Left gives the Dock icons the recovered two-stage elastic response with a 20ms recoil cascade and bass cue', leftEdge.cls.includes('edge-left') && leftEdge.animation === 'dock-edge-left-pull, dock-edge-left-recoil' && same(leftEdge.delays, ['0s, 0.112s', '0s, 0.132s', '0s, 0.152s', '0s, 0.172s', '0s, 0.192s', '0s, 0.212s']) && leftEdge.focus === leftEdge.expected && (await call('sounds')).at(-1) === 'EDGE', { ...leftEdge, sounds: await call('sounds') });
+    check('The retained 118 Hz bass cue uses the requested doubled gain', mainSource.includes('EDGE: [118, 0.078, 0.104]'));
+    await current.waitForTimeout(600);
     check('Dock edge response settles without moving focus', !(await current.locator('#dock').getAttribute('class')).includes('edge-') && (await state()).focusAction === leftEdge.expected, await state());
     await nav('right', 'right', 'right', 'right');
     const fifthSlot = await current.evaluate(() => { const shelf = document.getElementById('shelf').getBoundingClientRect(), focus = document.querySelector('#track .tile.is-focus').getBoundingClientRect(), track = document.getElementById('track').style.transform; return { left: focus.left - shelf.left, right: shelf.right - focus.right, track }; });
@@ -989,7 +1006,7 @@ try {
     check('Moving past position five shifts one full slot and exposes one complete next app', Math.abs(advancedSlot.focusLeft - 1136) < 1 && Math.abs(advancedSlot.nextLeft - 1420) < 1 && Math.abs(advancedSlot.nextRight) < 1 && advancedSlot.track.includes('(-284px'), advancedSlot);
     await nav(...Array(homeCount + 1).fill('right'));
     const rightEdge = await current.evaluate(() => { const tiles = document.querySelectorAll('#track .tile .tile-content'), state = ShoreQA.state(); return { cls: document.getElementById('dock').className, animation: tiles.length ? getComputedStyle(tiles[tiles.length - 1]).animationName : '', focus: state.focusAction, expected: 'home.app.' + state.committed.home[state.committed.home.length - 1] }; });
-    check('Blocked Right mirrors the inward elastic response at the last app', rightEdge.cls.includes('edge-right') && rightEdge.animation === 'dock-edge-right' && rightEdge.focus === rightEdge.expected && (await call('sounds')).at(-1) === 'EDGE', { ...rightEdge, sounds: await call('sounds') });
+    check('Blocked Right mirrors the recovered two-stage elastic response at the last app', rightEdge.cls.includes('edge-right') && rightEdge.animation === 'dock-edge-right-pull, dock-edge-right-recoil' && rightEdge.focus === rightEdge.expected && (await call('sounds')).at(-1) === 'EDGE', { ...rightEdge, sounds: await call('sounds') });
     await nav(...Array(homeCount + 1).fill('left'));
     await nav('up');
     check('Up from the app bar first lands on the existing Home controls', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
@@ -1002,7 +1019,7 @@ try {
       return { action: ShoreQA.state().focusAction, zone: ShoreQA.where().zone, sceneTop: scene.top, bgTop: bg.top - stage.top, homeTop: home.top - stage.top, dockBottom: dock.bottom - stage.top, iconGap: label.left - icon.right, label: label.width ? document.getElementById('curateLabel').textContent : '', radius: getComputedStyle(document.getElementById('scene')).borderTopLeftRadius, entryBackground: style.backgroundColor, entryShadow: style.boxShadow, revealHeight: document.getElementById('curateReveal').getBoundingClientRect().height, focusCount: ShoreQA.where().focusCount, sounds: ShoreQA.sounds() };
     });
     check('Up reveals the compact, unplated curator label with preserved inverse parallax', tray.action === 'home.curate' && tray.zone === 'curate' && Math.abs(tray.sceneTop - 130) < 1 && Math.abs(tray.bgTop - 68) < 1 && Math.abs(tray.homeTop - 152) < 1 && Math.abs(tray.homeTop - tray.bgTop - 84) < 1 && tray.dockBottom <= 1080 && parseFloat(tray.radius) >= 48 && tray.revealHeight === 130 && tray.iconGap >= 23 && tray.label === 'curate your backdrops' && tray.entryBackground === 'rgba(0, 0, 0, 0)' && tray.entryShadow === 'none' && tray.focusCount === 1, tray);
-    check('Home navigation uses a soft move cue with a distinct curator-entry pitch', tray.sounds[tray.sounds.length - 2] === 'MOVE' && tray.sounds[tray.sounds.length - 1] === 'UP', tray.sounds);
+    check('The top curator reveal uses the same cue as the bottom Sources reveal', tray.sounds[tray.sounds.length - 2] === 'MOVE' && tray.sounds[tray.sounds.length - 1] === 'DOWN', tray.sounds);
     await current.screenshot({ path: out + 'curator-tray.jpg', quality: 92 });
     await nav('down');
     check('Down from Curate lands on the existing Home controls instead of skipping them', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
@@ -1082,6 +1099,8 @@ try {
     check('Badge, source name and port use a compact vertical rhythm', flags.every(item => item.compact), flags);
     check('The smaller HDMI label retains the raised source-icon alignment', flags.every(item => item.portSize === 18 && item.textOffset >= 3 && item.textOffset <= 4), flags);
     check('Capability flags use the readable charcoal treatment', flags.every(item => /rgba?\(122, 122, 122/.test(item.color) && /rgba?\(28, 28, 28/.test(item.background)), flags);
+    await nav('ok');
+    check('Selecting a source collapses the tray before handing control to the TV', (await call('where')).zone === 'apps' && !(await current.locator('#stage').evaluate(node => node.classList.contains('sources-open'))), await call('where'));
   });
   await run('List opens the same HDMI source tray', async () => {
     await page();
@@ -1099,9 +1118,27 @@ try {
         visible: getComputedStyle(inputs).visibility, focused: focused && focused.dataset.action, sounds: ShoreQA.sounds() };
     });
     check('Down from the last List app reveals and focuses Sources', sourceTray.open && sourceTray.display === 'flex' && sourceTray.visible === 'visible' && /^home\.input\./.test(sourceTray.focused || ''), sourceTray);
-    check('Opening Sources has a distinct quiet down cue', sourceTray.sounds[sourceTray.sounds.length - 1] === 'DOWN', sourceTray.sounds);
+    check('Opening Sources uses the shared lower reveal cue', sourceTray.sounds[sourceTray.sounds.length - 1] === 'DOWN', sourceTray.sounds);
     await nav('up');
     check('Up closes Sources back to the last List app', (await state()).focusAction === 'home.app.xbox' && !(await current.locator('#stage').evaluate(el => el.classList.contains('sources-open'))), await call('where'));
+  });
+  await run('Exit menu restores its final copy, icons, opacity, spacing and fast return', async () => {
+    await page(); await nav('back');
+    const exit = await current.evaluate(() => {
+      const spans = [...document.querySelectorAll('.exit-message-line span')], buttons = [...document.querySelectorAll('.exit-choice')];
+      const rects = buttons.map(button => button.getBoundingClientRect());
+      return { view: ShoreQA.where().view, copy: spans.map(span => span.textContent), opacity: spans.map(span => getComputedStyle(span).opacity),
+        actions: buttons.map(button => button.dataset.action), paths: buttons.map(button => [...button.querySelectorAll('path')].map(path => path.getAttribute('d'))),
+        gap: rects.length === 2 ? rects[1].left - rects[0].right : -1 };
+    });
+    check('Exit copy uses the final capitalization, segmented opacity and no period', exit.view === 'message' && same(exit.copy, ['Go back', 'or open', 'Samsung Home']) && same(exit.opacity, ['1', '0.5', '1']), exit);
+    check('Exit uses separated back-arrow and house SVG controls', same(exit.actions, ['message.stay', 'message.samsung']) && exit.paths[0].includes('m12 19-7-7 7-7') && exit.paths[1].some(path => path.includes('M3 10')) && exit.gap >= 90, exit);
+    await act('message.stay');
+    check('Go back restores Home immediately', (await call('where')).view === 'home', await call('where'));
+    await current.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await nav('back'); await current.waitForFunction(() => ShoreQA.where().view === 'message');
+    await nav('right', 'ok'); await current.waitForFunction(() => __tv.calls.length > 0);
+    check('Samsung Home remains the explicit second action', (await current.evaluate(() => __tv.calls.at(-1))).id === 'com.samsung.tv.csfs', await current.evaluate(() => __tv.calls));
   });
   await run('Physical-key repeats and Back hierarchy', async () => {
     await page(); await editor(); await remove('netflix');
