@@ -356,13 +356,11 @@ try {
     }
     for (const axis of ['apps', 'controls']) for (const value of ['icons', 'both', 'text']) { await look({ [axis]: value }); check(axis + ' ' + value + ' persists', (await state()).look[axis] === value); }
     await look({ bg: 'photo', layout: 'dock', focus: 'glass', apps: 'both', controls: 'icons' });
-    const homeControls = await current.evaluate(() => [...document.querySelectorAll('.quiet-utils .u')].map(button => ({ action: button.dataset.action, background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow, radius: getComputedStyle(button).borderRadius })));
-    check('All Apps and Settings carry the shared glass material', homeControls.length === 2 && homeControls.every(button => button.background !== 'none' && button.shadow !== 'none' && button.radius === '32px'), homeControls);
+    const homeControls = await current.evaluate(() => [...document.querySelectorAll('.quiet-utils .u')].map(button => ({ action: button.dataset.action, background: getComputedStyle(button).backgroundColor, radius: getComputedStyle(button).borderRadius })));
+    check('All Apps and Settings carry the requested ten-percent white tint', homeControls.length === 2 && homeControls.every(button => button.background.includes('0.1') && button.radius === '32px'), homeControls);
     await nav('up');
-    const focusedHomeControl = await current.evaluate(() => { const button = document.querySelector('.quiet-utils .u.is-focus'); return button && { action: button.dataset.action, background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow }; });
-    check('The focused Home control raises the shared glass material', focusedHomeControl && focusedHomeControl.background !== 'none' && focusedHomeControl.shadow !== 'none', focusedHomeControl);
-    const curatorControls = await current.evaluate(() => [...document.querySelectorAll('.curator-control')].map(button => ({ background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow })));
-    check('Curator controls use the same glass material family', curatorControls.length === 4 && curatorControls.every(button => button.background !== 'none' && button.shadow !== 'none'), curatorControls);
+    const focusedHomeControl = await current.evaluate(() => { const button = document.querySelector('.quiet-utils .u.is-focus'); return button && { action: button.dataset.action, background: getComputedStyle(button).backgroundColor }; });
+    check('The focused Home control raises its white tint to twenty percent', focusedHomeControl && focusedHomeControl.background.includes('0.2'), focusedHomeControl);
     check('Home controls use one glass plate without the obsolete dark utility lens', await current.locator('.ut-lens.is-current').count() === 0, await current.locator('.ut-lens').evaluateAll(nodes => nodes.map(node => node.className)));
     await nav('down');
     for (const apps of ['icons', 'both', 'text']) {
@@ -978,7 +976,7 @@ try {
     const homeCount = (await state()).committed.home.length;
     await nav(...Array(homeCount + 1).fill('left'));
     const leftEdge = await current.evaluate(() => { const tiles = document.querySelectorAll('#track .tile .tile-content'), state = ShoreQA.state(); return { cls: document.getElementById('dock').className, animation: tiles.length ? getComputedStyle(tiles[0]).animationName : '', focus: state.focusAction, expected: 'home.app.' + state.committed.home[0] }; });
-    check('Blocked Left gives the Dock icons an inward elastic end response with a bass edge cue', leftEdge.cls.includes('edge-left') && leftEdge.animation === 'dock-edge-left' && leftEdge.focus === leftEdge.expected && (await call('sounds')).at(-1) === 'EDGE', { ...leftEdge, sounds: await call('sounds') });
+    check('Blocked Left gives the Dock icons a leftward elastic end response', leftEdge.cls.includes('edge-left') && leftEdge.animation === 'dock-edge-left' && leftEdge.focus === leftEdge.expected, leftEdge);
     await current.waitForTimeout(460);
     check('Dock edge response settles without moving focus', !(await current.locator('#dock').getAttribute('class')).includes('edge-') && (await state()).focusAction === leftEdge.expected, await state());
     await nav('right', 'right', 'right', 'right');
@@ -989,7 +987,7 @@ try {
     check('Moving past position five shifts one full slot and exposes one complete next app', Math.abs(advancedSlot.focusLeft - 1136) < 1 && Math.abs(advancedSlot.nextLeft - 1420) < 1 && Math.abs(advancedSlot.nextRight) < 1 && advancedSlot.track.includes('(-284px'), advancedSlot);
     await nav(...Array(homeCount + 1).fill('right'));
     const rightEdge = await current.evaluate(() => { const tiles = document.querySelectorAll('#track .tile .tile-content'), state = ShoreQA.state(); return { cls: document.getElementById('dock').className, animation: tiles.length ? getComputedStyle(tiles[tiles.length - 1]).animationName : '', focus: state.focusAction, expected: 'home.app.' + state.committed.home[state.committed.home.length - 1] }; });
-    check('Blocked Right mirrors the inward elastic response at the last app', rightEdge.cls.includes('edge-right') && rightEdge.animation === 'dock-edge-right' && rightEdge.focus === rightEdge.expected && (await call('sounds')).at(-1) === 'EDGE', { ...rightEdge, sounds: await call('sounds') });
+    check('Blocked Right mirrors the elastic response at the last app', rightEdge.cls.includes('edge-right') && rightEdge.animation === 'dock-edge-right' && rightEdge.focus === rightEdge.expected, rightEdge);
     await nav(...Array(homeCount + 1).fill('left'));
     await nav('up');
     check('Up from the app bar first lands on the existing Home controls', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));

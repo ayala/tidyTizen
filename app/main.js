@@ -112,7 +112,7 @@
   var VALUE_NAMES = { dark: 'Dark', light: 'Light', photo: 'Photo', list: 'List', dock: 'Dock', type: 'Type', glass: 'Glass', soft: 'Soft', frost: 'Frost', tint: 'Clear tint', icons: 'Icons', both: 'Icons and text', text: 'Text', on: 'On', off: 'Off' };
   var UTIL = { apps: ['All apps', 'apps'], arrange: ['Arrange', 'arrange'], settings: ['Settings', 'settings'] };
   var MSG = {
-    leave: { title: '', line: 'Go back or open Samsung Home', note: '', actions: [['stay', 'Go back'], ['samsung', 'Samsung Home']] }
+    leave: { title: 'Leave Home?', line: 'Open Samsung Home?', note: '', actions: [['stay', 'Stay'], ['samsung', 'Samsung Home']] }
   };
   var SVG = {
     art: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 3 3 2.5-2.5 5 5"/>',
@@ -1180,7 +1180,7 @@
     return [{ id: 'background', label: 'Background', value: S.c.bg === 'photo' && S.c.artwork !== 'scenery' ? artworkName(S.c.artwork) : S.c.bg === 'photo' ? wall(S.c.wall).name : VALUE_NAMES[S.c.bg] },
       { id: 'layout', label: 'Layout', value: VALUE_NAMES[S.c.layout] },
       { id: 'typography', label: 'Typography', value: FONTS[S.c.font].name },
-      { id: 'focus', label: 'Focus', value: 'UI Style + Sound' },
+      { id: 'focus', label: 'Focus', value: VALUE_NAMES[S.c.focus] + (materialApplies() ? ', ' + VALUE_NAMES[S.c.material] : '') },
       { id: 'editor', label: 'Apps on Home', value: n + (n === 1 ? ' app' : ' apps') },
       { id: 'samsung', label: 'Samsung', value: 'Home and TV settings' }];
   }
@@ -1615,8 +1615,7 @@
     var AudioEngine = window.AudioContext || window.webkitAudioContext, context, oscillator, gain, now;
     var cue = {
       MOVE: [500, 0.036, 0.045], UP: [610, 0.044, 0.055], DOWN: [420, 0.044, 0.055],
-      LEFT: [470, 0.038, 0.048], RIGHT: [540, 0.038, 0.048], SELECT: [680, 0.052, 0.060], BACK: [360, 0.048, 0.045],
-      EDGE: [118, 0.078, 0.030]
+      LEFT: [470, 0.038, 0.048], RIGHT: [540, 0.038, 0.048], SELECT: [680, 0.052, 0.060], BACK: [360, 0.048, 0.045]
     }[type] || [500, 0.036, 0.045];
     navSoundLog.push(type); if (navSoundLog.length > 40) navSoundLog.shift();
     if (!AudioEngine) return;
@@ -1655,7 +1654,6 @@
        direction repeatedly, matching the native row's elastic end stop. */
     dock.offsetWidth;
     dock.className += ' ' + cls;
-    if (S.c.uiAudio !== 'off') playSoftCue('EDGE');
     mainNavEdgeTimer = setTimeout(function () {
       if (dock) dock.className = dock.className.replace(/\s+edge-(?:left|right)/g, '');
     }, 420);
