@@ -1766,9 +1766,10 @@
       { id: 'curate', label: 'curate your backdrops', action: 'home.curate', icon: 'curate' },
       { id: 'apps', label: 'all apps', action: 'util.apps', icon: 'apps' },
       { id: 'settings', label: 'settings', action: 'util.settings', icon: 'settings' }
-    ], index = open ? clamp(t.f.u || 0, 0, entries.length - 1) : 0, html = '';
+    ], index = open ? clamp(t.f.u || 0, 0, entries.length - 1) : 0, html = '', geometry = dockGeom(S.c.home.length);
     curateReveal.setAttribute('aria-hidden', open ? 'false' : 'true');
     curateLabel.textContent = entries[index].label;
+    curateControls.style.left = (geometry.x + geometry.w - 256) + 'px';
     entries.forEach(function (entry, i) {
       html += '<button type="button" tabindex="-1" class="curate-control' + (open && i === index ? ' is-focus' : '') + '" data-z="top-control" data-i="' + i + '" data-action="' + entry.action + '" aria-label="' + entry.label + '">' + icon(entry.icon) + '</button>';
     });

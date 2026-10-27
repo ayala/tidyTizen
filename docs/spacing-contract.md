@@ -7,7 +7,7 @@ Spacing is part of tidyTizen's functional definition. It applies to every existi
 - Icon, logo, status dot, checkmark, thumbnail, remote glyph, or swatch beside text: at least 16 px of visible edge-to-edge space.
 - Attribution marks and descriptive rows: at least 24 px.
 - Adjacent compact controls: at least 20 px.
-- Adjacent controls in the black Home tray: at least 40 px, including focused scale states.
+- Adjacent controls in the black Home tray: at least 32 px, including focused states.
 - Adjacent sections or unrelated groups must have a visibly larger gutter than items within a group.
 
 These are minimums, not target values. Optical balance can require more space.
@@ -16,7 +16,7 @@ These are minimums, not target values. Optical balance can require more space.
 
 Use a deliberate layout gutter on the element that owns the relationship. Do not rely on spaces in text, glyph side-bearings, transparent pixels inside an asset, absolute-position coincidence, inherited `gap`, or a margin that only works for one label length. Account for transforms, focus growth, font metrics, localization, and the 1920 × 1080 stage scale.
 
-The target Tizen 6 browser does not reliably apply flexbox `gap`. Any production flex layout that depends on separation must include a Tizen-compatible sibling margin (for example, `.item + .item { margin-top: ... }` or `margin-left`) and the rendered TV state must be checked. Desktop support for `gap` is not sufficient. The Curate, All Apps and Settings tray uses a 40 px sibling margin and must retain that visible edge-to-edge gutter after focus scaling.
+The target Tizen 6 browser does not reliably apply flexbox `gap`. Any production flex layout that depends on separation must include a Tizen-compatible sibling margin (for example, `.item + .item { margin-top: ... }` or `margin-left`) and the rendered TV state must be checked. Desktop support for `gap` is not sufficient. The Curate, All Apps and Settings tray uses a 32 px sibling margin and must retain that visible edge-to-edge gutter in every focus state.
 
 ## Verification rule
 
