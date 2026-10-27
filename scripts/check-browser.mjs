@@ -262,6 +262,12 @@ try {
   await run('Startup fallbacks remain usable', async () => {
     await page({ noFontAPI: true });
     check('Missing font-loading API has usable baseline Home', (await state()).look.font === 'manrope' && (await call('where')).focusCount === 1);
+    await current.waitForFunction(() => document.getElementById('startupCover').classList.contains('is-clear'));
+    const startup = await current.evaluate(() => {
+      const cover = document.getElementById('startupCover'), style = getComputedStyle(cover);
+      return { className: cover.className, opacity: style.opacity, pointerEvents: style.pointerEvents };
+    });
+    check('Startup cover clears only after the committed Home is ready', startup.className.includes('is-clear') && startup.pointerEvents === 'none', startup);
     await closePage();
     await page({ seed: baseline({ mode: 'open' }), storageFailure: true });
     check('Failed open-mode write retains prior photo', (await state()).wallpaper === walls[0].id && (await stored()).wallpaper === walls[0].id);

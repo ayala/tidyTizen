@@ -1675,7 +1675,7 @@
 
   /* ---------- Rendering ---------- */
   var $ = function (id) { return document.getElementById(id); };
-  var stage = $('stage'), homeEl = $('home'), caption = $('caption'), utilsEl = $('utils'), inputsEl = $('inputs');
+  var stage = $('stage'), startupCover = $('startupCover'), startupRevealed = false, homeEl = $('home'), caption = $('caption'), utilsEl = $('utils'), inputsEl = $('inputs');
   var curateReveal = $('curateReveal'), curateLabel = $('curateLabel'), curateControls = $('curateControls'), curatorEl = $('curator'), curatorImage = $('curatorImage');
   var curatorTitle = $('curatorTitle'), curatorCount = $('curatorCount'), curatorEmpty = $('curatorEmpty'), curatorOptions = $('curatorOptions'), curatorOptionsTrack = $('curatorOptionsTrack');
   var utilFocusLabel = $('utilFocusLabel'), utilFocusKey = '', appFocusName = $('appFocusName');
@@ -1732,6 +1732,18 @@
     renderAppearance(t);
     renderCurator(t);
     renderFocusStatus(t);
+    revealStartup();
+  }
+
+  function startupReady() {
+    return fontsReady && !S.pending && !!S.shown && S.shown.bg === S.c.bg && S.shown.wall === S.c.wall && S.shown.font === S.c.font;
+  }
+  function revealStartup() {
+    if (startupRevealed || !startupReady()) return;
+    startupRevealed = true;
+    window.requestAnimationFrame(function () { window.requestAnimationFrame(function () {
+      startupCover.className = 'startup-cover is-clear';
+    }); });
   }
 
   function applyHomeFont() {
@@ -2784,7 +2796,7 @@
     Array.prototype.forEach.call(active, function (el) { if (renderedAction(el)) { count++; if (el.getAttribute('data-action') === action) name = el.getAttribute('aria-label') || el.textContent.replace(/\s+/g, ' ').trim(); } });
     return { view: top().id, settingsGroup: top().id === 'wallpaper' ? 'wallpaper' : top().id === 'appearance' ? top().group : null, focus: name, focusAction: action, focusCount: count, wallpaper: S.wallShown, zone: top().f && top().f.zone || null };
   };
-  QA.ready = function () { return fontsReady && !S.pending && !!S.shown && S.shown.bg === S.c.bg && S.shown.wall === S.c.wall && S.shown.font === S.c.font; };
+  QA.ready = startupReady;
   QA.nav = function () { var keys = arguments.length === 1 && Array.isArray(arguments[0]) ? arguments[0] : Array.prototype.slice.call(arguments); keys.forEach(function (key) { if (!NAV[key]) throw new Error('Unknown key'); press(NAV[key]); }); return QA.state(); };
   QA.look = function (patch) { setLook(patch, {}); return QA.state(); };
   QA.scene = function (name) { if (['home', 'apps', 'settings', 'appearance', 'editor'].indexOf(name) < 0) throw new Error('Unknown view'); goScene(name); return QA.state(); };
