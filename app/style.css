@@ -210,12 +210,15 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000}
 .curate-open.l-dock .dock,.curate-open.l-dock .cue,.curate-open.l-dock .dock-action{transform:translate3d(0,-88px,0)}
 .at-home.l-list .ph-scene{transition:transform 240ms var(--source-ease)}
 .curate-open.l-list .ph-scene{transform:translate3d(0,-66px,0)}
-.curate-open.l-list .quiet-utils,.curate-open.l-list .util-focus-label{transform:translate3d(0,-88px,0)}
+.at-home .quiet-utils,.at-home .util-focus-label{display:none}
 .curate-reveal{position:absolute;z-index:4;left:0;top:0;width:1920px;height:130px;display:flex;align-items:center;justify-content:center;color:#f6f1e7;background:#000;opacity:0;visibility:hidden;transform:translate3d(0,-130px,0);pointer-events:none;transition:transform 240ms var(--source-ease),opacity 100ms linear,visibility 0s linear 240ms;will-change:transform,opacity}
 .curate-open .curate-reveal{opacity:1;visibility:visible;transform:translate3d(0,0,0);pointer-events:auto;transition-delay:0s}
-.curate-entry{height:64px;padding:0;display:inline-flex;align-items:center;color:rgba(246,241,231,.78);background:transparent;box-shadow:none;font-size:38px;line-height:48px;font-weight:500;letter-spacing:-.7px;white-space:nowrap;transform:scale(1);transition:transform 160ms var(--source-ease),color 100ms linear}
-.curate-entry .symbol-image-plus{width:40px;height:40px;margin-right:24px}
-.curate-entry.is-focus{color:rgba(246,241,231,.88);background:transparent;box-shadow:none;transform:scale(1.02)}
+.curate-label{position:absolute;left:548px;top:41px;width:480px;height:48px;color:rgba(246,241,231,.88);font-size:38px;line-height:48px;font-weight:500;letter-spacing:-.7px;text-align:left;white-space:nowrap;pointer-events:none}
+.curate-controls{position:absolute;left:1128px;top:33px;height:64px;display:flex;align-items:center}
+.curate-control{width:64px;height:64px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:32px;color:rgba(246,241,231,.66);background:rgba(255,255,255,.10);box-shadow:inset 0 1px 0 rgba(255,255,255,.10);transform:scale(1);transition:transform 160ms var(--source-ease),color 100ms linear,background-color 120ms linear}
+.curate-control+.curate-control{margin-left:40px}
+.curate-control .ico{width:34px;height:34px;stroke-width:1.8}
+.curate-control.is-focus{color:#f6f1e7;background:rgba(255,255,255,.20);transform:scale(1)}
 
 /* Full-screen, remote-first TMDB curator. Each control is a stable circular
    target; directions wrap and the lower target exists only for selected art. */

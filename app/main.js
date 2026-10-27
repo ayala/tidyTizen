@@ -116,6 +116,7 @@
   };
   var SVG = {
     art: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 3 3 2.5-2.5 5 5"/>',
+    curate: '<path d="M16 5h6"/><path d="M19 2v6"/><path d="M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><circle cx="9" cy="9" r="2"/>',
     apps: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>',
     arrange: '<path d="M4 8.5h14M15 5.5l3 3-3 3M20 15.5H6M9 12.5l-3 3 3 3"/>',
     settings: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><circle cx="12" cy="12" r="4"/>',
@@ -792,6 +793,7 @@
 
   /* ---------- Navigation targets ---------- */
   function utils() { return ['apps', 'settings']; }
+  function topControls() { return ['curate', 'apps', 'settings']; }
   /* prev/next run along the apps; out goes to the controls, inn comes back (or to a per-app action). */
   function axes() {
     var v = S.c.layout === 'list';
@@ -800,6 +802,10 @@
   function utilAction(u) {
     if (u === 'apps') openApps();
     else openSettings();
+  }
+  function topControlAction(u) {
+    if (u === 'curate') openCurator();
+    else utilAction(u);
   }
   function addAppsRoute() { openEditor('home'); }
   function openSettings() { push({ id: 'settings', f: { id: S.settingsFocus } }); }
@@ -859,22 +865,15 @@
   /* ---------- Home (browse) ---------- */
   V.home = {
     key: function (t, k) {
-      var f = t.f, h = S.c.home, U = utils(), x = axes(), i = ensureSel();
-      if (S.c.layout === 'list') { listHomeKey(t, k, i, U); return; }
-      if (f.zone === 'util') {
-        f.u = clamp(f.u, 0, U.length - 1);
-        if (k === 'up') f.zone = 'curate';
-        else if (k === x.prev && f.u > 0) f.u--;
-        else if (k === x.next && f.u < U.length - 1) f.u++;
-        else if (k === x.inn || k === 'back') f.zone = 'apps';
-        else if (k === 'ok') { S.lastUtil = f.u; utilAction(U[f.u]); return; }
-        S.lastUtil = f.u;
-        return;
-      }
+      var f = t.f, h = S.c.home, T = topControls(), x = axes(), i = ensureSel();
+      if (S.c.layout === 'list') { listHomeKey(t, k, i, T); return; }
+      if (f.zone === 'util') { f.zone = 'curate'; f.u = 0; }
       if (f.zone === 'curate') {
-        if (k === 'down') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
-        else if (k === 'back') f.zone = 'apps';
-        else if (k === 'ok') openCurator();
+        f.u = clamp(f.u || 0, 0, T.length - 1);
+        if (k === 'left' && f.u > 0) f.u--;
+        else if (k === 'right' && f.u < T.length - 1) f.u++;
+        else if (k === 'down' || k === 'back') f.zone = 'apps';
+        else if (k === 'ok') { topControlAction(T[f.u]); return; }
         return;
       }
       if (f.zone === 'inputs') {
@@ -887,7 +886,7 @@
         return;
       }
       f.zone = 'apps';
-      if (k === x.out) { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+      if (k === x.out) { f.zone = 'curate'; f.u = 0; }
       else if (k === 'down') { f.zone = 'inputs'; f.s = clamp(S.inputFocus, 0, INPUTS.length - 1); }
       else if (k === 'back') openMessage('leave');
       else if (!h.length) { if (k === 'ok') addAppsRoute(); }
@@ -896,8 +895,7 @@
       else if (k === 'ok') launch(S.sel);
     },
     point: function (t, z, i) {
-      if (z === 'util') { t.f.zone = 'util'; t.f.u = i; S.lastUtil = i; }
-      else if (z === 'curate-entry') { t.f.zone = 'curate'; }
+      if (z === 'top-control') { t.f.zone = 'curate'; t.f.u = i; }
       else if (z === 'app') { t.f.zone = 'apps'; setSel(S.c.home[i]); }
       else if (z === 'input') { t.f.zone = 'inputs'; t.f.s = i; S.inputFocus = i; }
       else if (z === 'empty') t.f.zone = 'apps';
@@ -905,7 +903,7 @@
       this.key(t, 'ok');
     }
   };
-  function listHomeKey(t, k, i, U) {
+  function listHomeKey(t, k, i, T) {
     var f = t.f, h = S.c.home;
     if (f.zone === 'inputs') {
       S.inputFocus = clamp(f.s === undefined ? S.inputFocus : f.s, 0, INPUTS.length - 1); f.s = S.inputFocus;
@@ -916,26 +914,18 @@
       S.inputFocus = f.s;
       return;
     }
-    if (f.zone === 'util') {
-      f.u = clamp(f.u, 0, U.length - 1);
-      if (k === 'up' && f.u > 0) f.u--;
-      else if (k === 'up') f.zone = 'curate';
-      else if (k === 'down' && f.u < U.length - 1) f.u++;
-      else if (k === 'left' || k === 'back') f.zone = 'apps';
-      else if (k === 'ok') { S.lastUtil = f.u; utilAction(U[f.u]); return; }
-      S.lastUtil = f.u;
-      return;
-    }
+    if (f.zone === 'util') { f.zone = 'curate'; f.u = 0; }
     if (f.zone === 'curate') {
-      if (k === 'down') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
-      else if (k === 'back') f.zone = 'apps';
-      else if (k === 'ok') openCurator();
+      f.u = clamp(f.u || 0, 0, T.length - 1);
+      if (k === 'left' && f.u > 0) f.u--;
+      else if (k === 'right' && f.u < T.length - 1) f.u++;
+      else if (k === 'down' || k === 'back') f.zone = 'apps';
+      else if (k === 'ok') { topControlAction(T[f.u]); return; }
       return;
     }
     f.zone = 'apps';
     if (k === 'up' && i > 0) setSel(h[i - 1]);
-    else if (k === 'up') f.zone = 'curate';
-    else if (k === 'right') { f.zone = 'util'; f.u = clamp(S.lastUtil, 0, U.length - 1); }
+    else if (k === 'up') { f.zone = 'curate'; f.u = 0; }
     else if (k === 'down' && i < h.length - 1) setSel(h[i + 1]);
     else if (k === 'down' && INPUTS.length) { f.zone = 'inputs'; f.s = clamp(S.inputFocus, 0, INPUTS.length - 1); }
     else if (k === 'back') openMessage('leave');
@@ -1686,7 +1676,7 @@
   /* ---------- Rendering ---------- */
   var $ = function (id) { return document.getElementById(id); };
   var stage = $('stage'), homeEl = $('home'), caption = $('caption'), utilsEl = $('utils'), inputsEl = $('inputs');
-  var curateReveal = $('curateReveal'), curateEntry = $('curateEntry'), curatorEl = $('curator'), curatorImage = $('curatorImage');
+  var curateReveal = $('curateReveal'), curateLabel = $('curateLabel'), curateControls = $('curateControls'), curatorEl = $('curator'), curatorImage = $('curatorImage');
   var curatorTitle = $('curatorTitle'), curatorCount = $('curatorCount'), curatorEmpty = $('curatorEmpty'), curatorOptions = $('curatorOptions'), curatorOptionsTrack = $('curatorOptionsTrack');
   var utilFocusLabel = $('utilFocusLabel'), utilFocusKey = '', appFocusName = $('appFocusName');
   var dock = $('dock'), shelf = $('shelf'), track = $('track'), plate = $('plate'), matScrim = $('matScrim'), dockEmpty = $('dockEmpty');
@@ -1772,9 +1762,17 @@
   }
 
   function renderCurateEntry(t) {
-    var open = t.id === 'home' && t.f.zone === 'curate';
+    var open = t.id === 'home' && t.f.zone === 'curate', entries = [
+      { id: 'curate', label: 'curate your backdrops', action: 'home.curate', icon: 'curate' },
+      { id: 'apps', label: 'all apps', action: 'util.apps', icon: 'apps' },
+      { id: 'settings', label: 'settings', action: 'util.settings', icon: 'settings' }
+    ], index = open ? clamp(t.f.u || 0, 0, entries.length - 1) : 0, html = '';
     curateReveal.setAttribute('aria-hidden', open ? 'false' : 'true');
-    curateEntry.className = 'curate-entry' + (open ? ' is-focus' : '');
+    curateLabel.textContent = entries[index].label;
+    entries.forEach(function (entry, i) {
+      html += '<button type="button" tabindex="-1" class="curate-control' + (open && i === index ? ' is-focus' : '') + '" data-z="top-control" data-i="' + i + '" data-action="' + entry.action + '" aria-label="' + entry.label + '">' + icon(entry.icon) + '</button>';
+    });
+    setHTML(curateControls, html);
   }
 
   function renderCurator(t) {
@@ -2683,6 +2681,8 @@
     if (action === 'appearance.bg' && top().id === 'appearance' && top().group === 'background') action = 'background.wallpaper';
     if (action === 'settings.appearance' && top().id === 'settings') action = 'settings.group.background';
     for (i = 0; i < els.length; i++) if (renderedAction(els[i]) && els[i].getAttribute('data-action') === action) { pointAt(els[i]); return true; }
+    if (top().id === 'home' && action === 'util.apps') { openApps(); after(); return true; }
+    if (top().id === 'home' && action === 'util.settings') { openSettings(); after(); return true; }
     return false;
   }
   function pointAt(el) {
@@ -2704,6 +2704,15 @@
     if (t.f.zone === z && t.f.u === i) return;
     t.f.zone = z; t.f.u = i;
     if (z === 'util') S.lastUtil = i;
+    render();
+  });
+  curateControls.addEventListener('mouseover', function (ev) {
+    var b = ev.target, t = top(), i;
+    while (b && b !== curateControls && !(b.getAttribute && b.getAttribute('data-z') === 'top-control')) b = b.parentNode;
+    if (!b || b === curateControls || t.id !== 'home' || t.f.zone !== 'curate' || (ev.relatedTarget && b.contains(ev.relatedTarget))) return;
+    i = Number(b.getAttribute('data-i'));
+    if (t.f.u === i) return;
+    t.f.u = i;
     render();
   });
   stage.addEventListener('click', function (ev) {

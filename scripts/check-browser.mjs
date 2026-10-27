@@ -370,27 +370,20 @@ try {
     }
     for (const axis of ['apps', 'controls']) for (const value of ['icons', 'both', 'text']) { await look({ [axis]: value }); check(axis + ' ' + value + ' persists', (await state()).look[axis] === value); }
     await look({ bg: 'photo', layout: 'dock', focus: 'glass', apps: 'both', controls: 'icons' });
-    const homeControls = await current.evaluate(() => [...document.querySelectorAll('.quiet-utils .u')].map(button => ({ action: button.dataset.action, background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow, radius: getComputedStyle(button).borderRadius })));
-    const homePlateColors = await current.evaluate(() => [...document.querySelectorAll('.quiet-utils .u')].map(button => getComputedStyle(button).backgroundColor));
-    check('All Apps and Settings retain their readable 10% white plates', homeControls.length === 2 && homeControls.every(button => button.radius === '32px') && homePlateColors.every(color => color === 'rgba(255, 255, 255, 0.1)'), { homeControls, homePlateColors });
     await nav('up');
-    const focusedHomeControl = await current.evaluate(() => { const button = document.querySelector('.quiet-utils .u.is-focus'); return button && { action: button.dataset.action, background: getComputedStyle(button).backgroundColor, shadow: getComputedStyle(button).boxShadow }; });
-    check('The focused Home control raises to its readable 20% white plate', focusedHomeControl && focusedHomeControl.background === 'rgba(255, 255, 255, 0.2)', focusedHomeControl);
+    const homeControls = await current.evaluate(() => [...document.querySelectorAll('.curate-control')].map(button => ({ action: button.dataset.action, background: getComputedStyle(button).backgroundColor, shadow: getComputedStyle(button).boxShadow, radius: getComputedStyle(button).borderRadius, icon: button.querySelector('.ico').getBoundingClientRect().width, stroke: getComputedStyle(button.querySelector('.ico')).strokeWidth })));
+    check('Curate, All Apps and Settings share matching 10%/20% circular glass controls', homeControls.length === 3 && homeControls.every((button, index) => button.radius === '32px' && button.icon === 34 && button.stroke === '1.8px' && button.background === (index === 0 ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.1)')), homeControls);
     const curatorControls = await current.evaluate(() => [...document.querySelectorAll('.curator-control')].map(button => ({ background: getComputedStyle(button).backgroundImage, shadow: getComputedStyle(button).boxShadow })));
     check('Curator controls retain their prior high-contrast gradient treatment', curatorControls.length === 4 && curatorControls.every(button => button.background !== 'none' && button.shadow !== 'none'), curatorControls);
     check('Home controls use one glass plate without the obsolete dark utility lens', await current.locator('.ut-lens.is-current').count() === 0, await current.locator('.ut-lens').evaluateAll(nodes => nodes.map(node => node.className)));
-    await nav('down');
     for (const apps of ['icons', 'both', 'text']) {
       await scene('home'); await look({ layout: 'list', apps, controls: 'both', focus: 'glass' });
-      await nav('up', 'down');
+      await nav(...Array(PRIMARY.length + 1).fill('up'));
       const listControls = await current.evaluate(() => {
-        const buttons = [...document.querySelectorAll('.quiet-utils .u')], rects = buttons.map(button => button.getBoundingClientRect());
-        const focused = document.querySelector('.quiet-utils .u.is-focus')?.getBoundingClientRect();
-        const lens = document.querySelector('.ut-lens.is-current')?.getBoundingClientRect();
-        return { widths: rects.map(rect => rect.width), gap: rects.length === 2 ? Math.max(rects[0].top, rects[1].top) - Math.min(rects[0].bottom, rects[1].bottom) : 0,
-          focusedWidth: focused?.width || 0, lensWidth: lens?.width || 0 };
+        const buttons = [...document.querySelectorAll('.curate-control')], rects = buttons.map(button => button.getBoundingClientRect());
+        return { widths: rects.map(rect => rect.width), gaps: rects.slice(1).map((rect, index) => rect.left - rects[index].right), focus: ShoreQA.state().focusAction, oldControlsVisible: [...document.querySelectorAll('.quiet-utils .u')].some(button => button.getClientRects().length && getComputedStyle(button).display !== 'none') };
       });
-      check('List controls keep at least 24px of rendered edge-to-edge separation with ' + apps + ' app treatment', listControls.widths.length === 2 && listControls.widths.every(width => width < 260) && listControls.gap >= 24 && listControls.focusedWidth > 0 && listControls.lensWidth === 0, listControls);
+      check('The top tray replaces the old List controls and keeps doubled spacing with ' + apps + ' app treatment', listControls.widths.length === 3 && listControls.widths.every(width => width >= 64) && listControls.gaps.every(gap => gap >= 38) && listControls.focus === 'home.curate' && !listControls.oldControlsVisible, listControls);
       await scene('home');
     }
     for (const material of ['soft', 'frost', 'tint']) { await look({ material }); check(material + ' matches displayed bundle', (await state()).shown.material === material && (await state()).look.material === material); }
@@ -1009,20 +1002,23 @@ try {
     check('Blocked Right mirrors the recovered two-stage elastic response at the last app', rightEdge.cls.includes('edge-right') && rightEdge.animation === 'dock-edge-right-pull, dock-edge-right-recoil' && rightEdge.focus === rightEdge.expected && (await call('sounds')).at(-1) === 'EDGE', { ...rightEdge, sounds: await call('sounds') });
     await nav(...Array(homeCount + 1).fill('left'));
     await nav('up');
-    check('Up from the app bar first lands on the existing Home controls', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
+    check('Up from the app bar opens the top tray with Curate focused', (await state()).focusAction === 'home.curate', await call('where'));
     const neutralDock = await current.evaluate(() => ({ appStates: document.querySelectorAll('#track .tile.is-focus, #track .tile.is-sel').length, plate: document.getElementById('plate').className }));
     check('Home controls fully clear the remembered app emphasis in Dock', neutralDock.appStates === 0 && !/on-focus|on-sel/.test(neutralDock.plate), neutralDock);
-    await nav('up');
     await current.waitForTimeout(280);
     const tray = await current.evaluate(() => {
-      const stage = document.getElementById('stage').getBoundingClientRect(), scene = document.getElementById('scene').getBoundingClientRect(), bg = document.querySelector('.bg').getBoundingClientRect(), home = document.getElementById('home').getBoundingClientRect(), dock = document.getElementById('dock').getBoundingClientRect(), icon = document.querySelector('.curate-entry .symbol-image-plus').getBoundingClientRect(), label = document.getElementById('curateLabel').getBoundingClientRect(), entry = document.getElementById('curateEntry'), style = getComputedStyle(entry);
-      return { action: ShoreQA.state().focusAction, zone: ShoreQA.where().zone, sceneTop: scene.top, bgTop: bg.top - stage.top, homeTop: home.top - stage.top, dockBottom: dock.bottom - stage.top, iconGap: label.left - icon.right, label: label.width ? document.getElementById('curateLabel').textContent : '', radius: getComputedStyle(document.getElementById('scene')).borderTopLeftRadius, entryBackground: style.backgroundColor, entryShadow: style.boxShadow, revealHeight: document.getElementById('curateReveal').getBoundingClientRect().height, focusCount: ShoreQA.where().focusCount, sounds: ShoreQA.sounds() };
+      const stage = document.getElementById('stage').getBoundingClientRect(), scene = document.getElementById('scene').getBoundingClientRect(), bg = document.querySelector('.bg').getBoundingClientRect(), home = document.getElementById('home').getBoundingClientRect(), dock = document.getElementById('dock').getBoundingClientRect(), label = document.getElementById('curateLabel').getBoundingClientRect(), buttons = [...document.querySelectorAll('.curate-control')], rects = buttons.map(button => button.getBoundingClientRect()), icons = buttons.map(button => button.querySelector('.ico'));
+      return { action: ShoreQA.state().focusAction, zone: ShoreQA.where().zone, sceneTop: scene.top, bgTop: bg.top - stage.top, homeTop: home.top - stage.top, dockBottom: dock.bottom - stage.top, labelGap: rects[0].left - label.right, labelLeft: label.left - stage.left, label: label.width ? document.getElementById('curateLabel').textContent : '', radius: getComputedStyle(document.getElementById('scene')).borderTopLeftRadius, buttonGaps: rects.slice(1).map((rect, index) => rect.left - rects[index].right), iconWidths: icons.map(icon => icon.getBoundingClientRect().width), iconStrokes: icons.map(icon => getComputedStyle(icon).strokeWidth), plateColors: buttons.map(button => getComputedStyle(button).backgroundColor), revealHeight: document.getElementById('curateReveal').getBoundingClientRect().height, focusCount: ShoreQA.where().focusCount, sounds: ShoreQA.sounds() };
     });
-    check('Up reveals the compact, unplated curator label with preserved inverse parallax', tray.action === 'home.curate' && tray.zone === 'curate' && Math.abs(tray.sceneTop - 130) < 1 && Math.abs(tray.bgTop - 68) < 1 && Math.abs(tray.homeTop - 152) < 1 && Math.abs(tray.homeTop - tray.bgTop - 84) < 1 && tray.dockBottom <= 1080 && parseFloat(tray.radius) >= 48 && tray.revealHeight === 130 && tray.iconGap >= 23 && tray.label === 'curate your backdrops' && tray.entryBackground === 'rgba(0, 0, 0, 0)' && tray.entryShadow === 'none' && tray.focusCount === 1, tray);
-    check('The top curator reveal uses the same cue as the bottom Sources reveal', tray.sounds[tray.sounds.length - 2] === 'MOVE' && tray.sounds[tray.sounds.length - 1] === 'DOWN', tray.sounds);
+    check('Up reveals the unified top tray with preserved inverse parallax', tray.action === 'home.curate' && tray.zone === 'curate' && Math.abs(tray.sceneTop - 130) < 1 && Math.abs(tray.bgTop - 68) < 1 && Math.abs(tray.homeTop - 152) < 1 && Math.abs(tray.homeTop - tray.bgTop - 84) < 1 && tray.dockBottom <= 1080 && parseFloat(tray.radius) >= 48 && tray.revealHeight === 130 && tray.labelLeft === 548 && tray.labelGap >= 90 && tray.label === 'curate your backdrops' && tray.buttonGaps.every(gap => gap >= 38) && tray.iconWidths.every(width => width === 34) && tray.iconStrokes.every(stroke => stroke === '1.8px') && tray.plateColors[0] === 'rgba(255, 255, 255, 0.2)' && tray.plateColors.slice(1).every(color => color === 'rgba(255, 255, 255, 0.1)') && tray.focusCount === 1, tray);
+    check('The top tray uses the same reveal cue as Sources', tray.sounds[tray.sounds.length - 1] === 'DOWN', tray.sounds);
+    await nav('right');
+    check('Right moves to All Apps and swaps the lowercase label', (await state()).focusAction === 'util.apps' && await current.locator('#curateLabel').textContent() === 'all apps', await call('where'));
+    await nav('right');
+    check('Right moves to Settings and swaps the lowercase label', (await state()).focusAction === 'util.settings' && await current.locator('#curateLabel').textContent() === 'settings', await call('where'));
     await current.screenshot({ path: out + 'curator-tray.jpg', quality: 92 });
     await nav('down');
-    check('Down from Curate lands on the existing Home controls instead of skipping them', /^util\.(apps|settings)$/.test((await state()).focusAction), await call('where'));
+    check('Down from the top tray returns directly to the selected app', /^home\.app\./.test((await state()).focusAction), await call('where'));
     await nav('up');
     await nav('ok'); await current.waitForFunction(() => ShoreQA.state().view === 'curator' && ShoreQA.state().curator.count >= 4);
     const first = (await state()).curator;
@@ -1106,10 +1102,10 @@ try {
     await page();
     await current.waitForFunction(() => document.querySelectorAll('#inputs .input').length === 4);
     await look({ layout: 'list', apps: 'text' });
-    await nav('right');
+    await nav(...Array(PRIMARY.length + 1).fill('up'));
     const neutralList = await current.evaluate(() => ({ appStates: document.querySelectorAll('#phRows .ph-row.is-focus, #phRows .ph-row.is-sel').length, plates: [...document.querySelectorAll('#phScene .ph-plate')].map(node => node.className) }));
-    check('Home controls fully clear the remembered app emphasis in List', neutralList.appStates === 0 && neutralList.plates.every(name => !/on-focus|on-sel/.test(name)), neutralList);
-    await nav('left');
+    check('The top tray fully clears the remembered app emphasis in List', neutralList.appStates === 0 && neutralList.plates.every(name => !/on-focus|on-sel/.test(name)), neutralList);
+    await nav('down');
     await nav(...Array(PRIMARY.length).fill('down'));
     const sourceTray = await current.evaluate(() => {
       const stage = document.querySelector('#stage'), inputs = document.querySelector('#inputs');
